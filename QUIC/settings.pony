@@ -1,0 +1,37 @@
+
+class QUICSettings
+  var maxBytesPerKey : (U64 | None) = None
+  var handshakeIdleTimeoutMs: (U64 | None) = None
+  var idleTimeoutMs: (U64 | None) = None
+  var mtuDiscoverySearchCompleteTimeoutUs: (U64 | None) = None
+  var tlsClientMaxSendBuffer: (U32 | None) = None
+  var tlsServerMaxSendBuffer: (U32 | None) = None
+  var streamRecvWindowDefault: (U32 | None) = None
+  var streamRecvBufferDefault: (U32 | None) = None
+  var connFlowControlWindow: (U32 | None) = None
+  var maxWorkerQueueDelayUs: (U32 | None) = None
+  var maxStatelessOperations: (U32 | None) = None
+  var initialWindowPackets: (U32 | None) = None
+  var sendIdleTimeoutMs: (U32 | None) = None
+  var innitialRttMs: (U32 | None) = None
+  var sendIdleTimeoutMs: (U32 | None) = None
+  var maxAckDelayMs: (U32 | None) = None
+  var disconnectTimeoutMs: (U32 | None) = None
+  var keepAliveIntervalMs: (U32 | None) = None
+  var congestionControlAlgorithm: (U16 | None) = None
+  var peerBidiStreamCount: (U16 | None) = None
+  var peerUnidiStreamCount: (U16 | None) = None
+  var maxBindingStatelessOperations: (U16 | None) = None
+  var statelessOperationExpirationMs: (U16 | None) = None
+  var minimumMtu: (U16 | None) = None
+  var maximumMtu: (U16 | None) = None
+  var sendBufferingEnabled: (Bool | None) = None
+  var pacingEnabled: (Bool | None) = None
+  var migrationEnabled: (Bool | None) = None
+  var datagramReceiveEnabled: (Bool | None) = None
+  var serverResumptionLevel: (Bool | None) = None
+  var greaseQuicBitEnabled: (Bool | None) = None
+  var ecnEnabled: (Bool | None) = None
+  var maxOperationsPerDrain: (U8 | None) = None
+  var mtuDiscoveryMissingProbeCount: (U8 | None) = None
+  var destCidUpdateIdleTimeoutMs: (U32 | None) = None
