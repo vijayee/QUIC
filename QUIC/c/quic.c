@@ -10,16 +10,31 @@
 #include <hashmap.h>
 
 
-static  HASHMAP(void*, *pony_callback) dispatcher;
+static  HASHMAP(void*, void*) callbackCache;
 size_t hash_pointer(void * input);
 int  ptrcmp(const void* ptr1, const char* ptr2);
-
-#if __linux__
-pthread_mutex_t DispatcherLock = PTHREAD_MUTEX_INITIALIZER;
+#if ___linux__
+  void platform_lock(pthread_mutex_t lock) {
+    pthread_mutex_lock(&lock);
+  }
+  void platform_unlock(pthread_mutex_t lock) {
+    EnterCriticalSection(&Lock);
+  }
 #endif
 #if _WIN32
-  CRITICAL_SECTION DispatcherLock;
-  InitializeCriticalSection(&DispatcherLock);
+  void platform_lock(CRITICAL_SECTION lock) {
+    InitializeCriticalSection(&lock);
+  }
+  void platform_unlock(CRITICAL_SECTION lock) {
+    pthread_mutex_unlock(&Lock);
+  }
+#endif
+#if __linux__
+pthread_mutex_t CacheLock = PTHREAD_MUTEX_INITIALIZER;
+#endif
+#if _WIN32
+  CRITICAL_SECTION CacheLock;
+  InitializeCriticalSection(&CaLock);
 #endif
 
 #if __linux__
@@ -29,39 +44,21 @@ pthread_mutex_t MSQuicLock = PTHREAD_MUTEX_INITIALIZER;
   CRITICAL_SECTION MSQuicLock;
   InitializeCriticalSection(&MSQuicLock);
 #endif
+
 HQUIC* quic_new_registration(QUIC_REGISTRATION_CONFIG* config) {
 
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   if (MSQuic == NULL) {
-    #if __linux__
-      pthread_mutex_lock(&MSQuicLock);
-    #endif
-    #if _WIN32
-      EnterCriticalSection(&MSQuicLock);
-    #endif
+    platform_lock(&MSQuicLock);
     if (QUIC_FAILED(Status = MsQuicOpen2(&MSQuic))) {
       pony_error();
-      #if __linux__
-            pthread_mutex_unlock(&MSQuicLock);
-      #endif
-      #if _WIN32
-        LeaveCriticalSection(&MSQuicLock);
-      #endif
+      platform_unlock(&MSQuicLock);
       return NULL;
     }
-    #if __linux__
-          pthread_mutex_unlock(&MSQuicLock);
-    #endif
-    #if _WIN32
-      LeaveCriticalSection(&MSQuicLock);
-    #endif
+    platform_unlock(&MSQuicLock);
   }
-  #if __linux__
-    pthread_mutex_lock(&MSQuicLock);
-  #endif
-  #if _WIN32
-    EnterCriticalSection(&MSQuicLock);
-  #endif
+
+  platform_lock(&MSQuicLock);
   HQUIC* registration = malloc(sizeof(HQUIC));
 
   if (QUIC_FAILED(Status = MSQuic->RegistrationOpen(config, registration))) {
@@ -74,12 +71,7 @@ HQUIC* quic_new_registration(QUIC_REGISTRATION_CONFIG* config) {
   } else {
     registration_count++;
   }
-  #if __linux__
-        pthread_mutex_unlock(&MSQuicLock);
-  #endif
-  #if _WIN32
-    LeaveCriticalSection(&MSQuicLock);
-  #endif
+  platform_unlock(&MSQuicLock);
 
   return registration;
 }
@@ -177,6 +169,7 @@ QUIC_SETTINGS* quic_new_settings(uint64_t* maxBytesPerKey,
   uint8_t* mtuDiscoveryMissingProbeCount,
   uint32_t* destCidUpdateIdleTimeoutMs) {
 
+  int result = false;
   QUIC_CREDENTIAL_CONFIG* settings = calloc(1, sizeof(QUIC_SETTINGS));
   if (maxBytesPerKey != NULL) {
     settings->MaxBytesPerKey = *maxBytesPerKey;
@@ -437,14 +430,83 @@ void quic_pony_dispatcher_init() {
     #endif
   }
 }
+uint8_t quic_is_new_connection_event(QUIC_CONNECTION_EVENT* event) {
+  if(Event->Type == QUIC_LISTENER_EVENT_NEW_CONNECTION) {
+     return 1;
+  } else {
+    return 0;
+  }
+}
 
-void quic_subscribe_stream_open (quicly_context_t* ctx, void * actor, void * cb, void* pb) {
-  struct pony_callback* pc;
-  pc = malloc(sizeof(pony_callback));
-  pc->receiver = actor;
-  pc->sender = pb;
-  hashmap_put(&dispatcher, cb, pc);
-  quicly_stream_open_t* stream_open = malloc(sizeof(quicly_stream_open_t));
-  stream_open->on_stream_open = cb;
-  ctx->stream_open = stream_open;
+HQUIC* quic_server_listner_open(HQUIC* registration, void* serverListenerCallback) {
+  HQUIC* listener = malloc(sizeof(HQUIC));
+
+  if (QUIC_FAILED(MSQuic->ListnerOpen(registration,serverListenerCallback, NULL,lisener))) {
+    quic_free(listener)
+    pony_error();
+    return NULL;
+  }
+  return listener;
+}
+void quic_server_listener_close(HQUIC* listener) {
+  if (listener != NULL) {
+    MSQuic->ListenerClose(listener);
+  }
+}
+
+void quic_cache_set(void* key, void* value) {
+  if (hashmap_put(&callbackCache, key, value) < 0) {
+    pony_error();
+    return;
+  }
+}
+
+void* quic_cache_get(void* key) {
+   void * result = hashmap_get(&callbackCache, key)
+   if (!result) {
+     pony_error();
+   }
+   return result;
+}
+
+void quic_cache_delete(void* key) {
+   void * result = hashmap_remove(&callbackCache, key)
+   if (!result) {
+     pony_error();
+   }
+   return result;
+}
+
+HQUIC* quic_receive_connection(QUIC_LISTENER_EVENT* event) {
+  return &Event->NEW_CONNECTION.Connection;
+}
+
+QUIC_STATUS quic_connection_set_configuration(HQUIC* connection, HQUIC* configuration) {
+  return MSQuic->ConnectionSetConfiguration(connection, configuration);
+}
+
+HQUIC* quic_server_listener_open(HQUIC* registration, void* serverListenerCallback) {
+  HQUOC* listener = malloc(sizeof(HQUIC))
+  if (QUIC_FAILED(Status = MsQuic->ListenerOpen(registration, serverListenerCallback, NULL, &Listener))) {
+        pony_error();
+        free(listener);
+        return NULL;
+  }
+  return listener;
+}
+
+uint8_t quic_get_connection_event_type_as_uint(QUIC_LISTENER_EVENT* event) {
+  return (uint8_t) event->Type;
+}
+
+void quic_send_resumption_ticket(HQUIC* connection) {
+  MSQuic->ConnectionSendResumptionTicket(connection, QUIC_SEND_RESUMPTION_FLAG_NONE, 0, NULL);
+}
+
+void quic_close_connection(HQUIC* connection) {
+  MSQUic->ConnectionClose(connection);
+}
+
+void quic_connection_set_callback(HQUIC* connection, void* connectionCallback) {
+  MsQuic->SetCallbackHandler(connection, connectionCallback, NULL);
 }

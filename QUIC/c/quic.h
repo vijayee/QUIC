@@ -58,3 +58,18 @@ struct pony_callback
 
 void* quic_retrieve_actor(HQUIC* self);
 void quic_pony_dispatcher_init();
+uint8_t quic_is_new_connection_event(QUIC_LISTENER_EVENT* event);
+HQUIC* quic_server_listener_open(HQUIC* registration, void* serverListenerCallback);
+void quic_server_listener_close(HQUIC* listener);
+void quic_cache_set(void* key, void* value);
+void* quic_cache_get(void* key);
+void quic_cache_delete(void* key);
+typedef quic_cache_get quic_server_configuration;
+typedef quic_cache_get quic_server_actor;
+typedef quic_cache_get quic_connection_actor;
+HQUIC* quic_receive_connection(QUIC_LISTENER_EVENT* event);
+void quic_connection_set_configuration(HQUIC* connection, HQUIC* configuration);
+void quic_connection_set_callback(HQUIC* connection, void* connectionCallback);
+uint8_t quic_get_connection_event_type_as_uint(QUIC_LISTENER_EVENT* event);
+void quic_send_resumption_ticket(HQUIC* connection);
+void quic_close_connection(HQUIC* connection);
