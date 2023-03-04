@@ -1,0 +1,19 @@
+{
+  "packages": [
+    "QUIC"
+  ],
+  "deps": [
+    {
+      "locator": "github.com/vijayee/Streams.git",
+      "version": "0.0.4"
+    }
+  ],
+  "info": {
+    "description": "Pony bindings for MSQUIC library implementation of QUIC network protocol",
+    "homepage": "https://github.com/vijayee/QUIC",
+    "license": "GPLv3",
+    "documentation_url": "",
+    "version": "0.0.1",
+    "name": "liboffs"
+  }
+}
