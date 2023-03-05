@@ -204,8 +204,25 @@ struct {
   #endif
 } quic_connection_event_context;
 
-quic_connection_event_context* quic_new_connection_event_context(void* connectionActor);
+quic_connection_event_context* quic_new_connection_event_context();
+void quic_connection_event_context_set_actor(quic_connection_event_context* ctx, void* connectionActor);
 
 void quic_free_connection_event_context(quic_connection_event_context* ctx);
 
 HQUIC* quic_connection_open(HQUIC* registration, void* callback);
+void quic_connection_set_connected_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_shutdown_initiated_by_transport_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_shutdown_initiated_by_peer_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_shutdown_complete_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_local_address_changed_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_peer_address_changed_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_peer_stream_started_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_streams_available_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_peer_needs_streams_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_ideal_processor_changed_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_datagram_state_changed_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_datagram_received_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_datagram_send_state_changed_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_resumed_changed_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_datagram_resumption_ticket_received_event(quic_connection_event_context* ctx, uint8_t value);
+void quic_connection_set_datagram_peer_certificate_received_event(quic_connection_event_context* ctx, uint8_t value);

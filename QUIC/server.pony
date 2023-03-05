@@ -14,6 +14,7 @@ use @quic_close_connection[None](connection: Pointer[None] tag)
 use @quic_connection_set_callback[None](connection: Pointer[None] tag, connectionCallback: Pointer[None] tag)
 use @quic_new_server_event_context[Pointer[None] tag](serverActor: Pointer[None] tag, configuration: Pointer[None] tag)
 use @quic_new_connection_event_context[Pointer[None] tag]()
+use @quic_connection_event_context_set_actor[None](ctx: Pointer[None] tag, connectionActor: Pointer[None] tag);
 use @quic_free_connection_event_context[None](ctx: Pointer[None] tag)
 use "collections"
 use "Streams"
@@ -47,8 +48,9 @@ actor QUICServer is NotificationEmitter
         let quicServer: QUICServer = @quic_server_actor(ctx)?
         let configuration: Pointer[None] tag = @quic_server_configuration(ctx)?
         let conn: Pointer[None] tag = @quic_receive_connection(event)
-        let connection: QUICConnection = QUICConnection._serverConnection(conn, ctx)
-        let connectionCtx: Pointer[None] tag  = @quic_new_connection_event_context[Pointer[None] tag]()
+        let connection: QUICConnection = QUICConnection._serverConnection(conn)
+        let connectionCtx: Pointer[None] tag = @quic_new_connection_event_context[Pointer[None] tag](addressof connection)
+        @quic_connection_event_context_set_actor(connectionCtx, addressof connection)
         let connectionCb = @{(conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
           return _QUICConnectionCallback(conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag)
         } val
@@ -58,7 +60,6 @@ actor QUICServer is NotificationEmitter
 
         if status == 0 then
           quicServer._acceptNewConnection(connection)
-          @quic_free_connection_event_context(connectionCtx)
         end
         return status
       else
@@ -71,6 +72,4 @@ actor QUICServer is NotificationEmitter
     try
       @quic_server_listener_close(_listener(_listener)
       @quic_free(_listener)
-      @quic_cache_delete(addressof this.@serverCallback)?
-      @quic_cache_delete(addressof this)?
     end

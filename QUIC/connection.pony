@@ -88,9 +88,9 @@ actor QUICConnection is NotificationEmitter
   let _streams: Array[QUICStream]
   let _ctx: Pointer[None] tag
 
-  new create(registration: QUICRegistration, configuration: QUICConfiguration, resumptionTicket: (Array[U8] val | None)) =>
+  new create(registration: QUICRegistration, configuration: QUICConfiguration, ctx: Pointer[None] tag, resumptionTicket: (Array[U8] val | None)) =>
     _streams = Array[QUICStream](3)
-    _ctx = quic_new_connection_event_context(addressof this)
+    _ctx = ctx
     try
       _connection = @quic_connection_open(registration, addressof this.connectionCallback)?
     else
@@ -98,7 +98,6 @@ actor QUICConnection is NotificationEmitter
     end
 
   new _serverConnection(conn: Pointer[None] tag, ctx: Pointer[None] tag) =>
-    ctx =
     streams = Array[QUICStream](3)
     connection = conn
 

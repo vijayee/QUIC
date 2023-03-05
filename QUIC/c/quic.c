@@ -561,9 +561,8 @@ void quic_stream_get_total_buffer(QUIC_STREAM_EVENT* event, uint8_t* buffer, HQU
   MSQuic->StreamReceiveComplete(stream, length);
 }
 
-quic_connection_event_context* quic_new_connection_event_context(void* connectionActor) {
+quic_connection_event_context* quic_new_connection_event_context() {
   quic_connection_event_context* ctx= calloc(1, sizeof(quic_connection_event_context));
-  ctx->connectionActor = connectionActor;
   ctx->QUIC_CONNECTION_EVENT_CONNECTED = 1;
   ctx->QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED = 1;
   ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT =1;
@@ -606,6 +605,10 @@ void quic_free_connection_event_context(quic_connection_event_context* ctx) {
   free(ctx);
 }
 
+void quic_connection_event_context_set_actor(quic_connection_event_context* ctx, void* connectionActor) {
+    ctx->connectionActor = connectionActor;
+}
+
 HQUIC* quic_connection_open(HQUIC* registration, void* callback, quic_connection_event_context* ctx) {
   HQUIC* connection = malloc(sizeof(HQUIC));
 
@@ -630,4 +633,100 @@ void* quic_server_actor(quic_server_event_context* ctx) {
 
 void* quic_server_configuration(quic_server_event_context* ctx) {
   return ctx->configuration;
+}
+
+void quic_connection_set_connected_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_CONNECTED_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_CONNECTED = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_CONNECTED_LOCK);
+}
+
+void quic_connection_set_shutdown_initiated_by_transport_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT_LOCK);
+}
+
+void quic_connection_set_shutdown_initiated_by_peer_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER_LOCK);
+}
+
+void quic_connection_set_shutdown_complete_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE_LOCK);
+}
+
+void quic_connection_set_local_address_changed_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED_LOCK);
+}
+
+void quic_connection_set_peer_address_changed_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED_LOCK);
+}
+
+void quic_connection_set_peer_stream_started_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx-> QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED_LOCK);
+  ctx-> QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED_LOCK);
+}
+
+void quic_connection_set_streams_available_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE_LOCK);
+}
+
+void quic_connection_set_peer_needs_streams_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS_LOCK);
+}
+
+void quic_connection_set_ideal_processor_changed_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED_LOCK);
+}
+
+void quic_connection_set_datagram_state_changed_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED_LOCK);
+}
+
+void quic_connection_set_datagram_received_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED_LOCK);
+}
+
+void quic_connection_set_datagram_send_state_changed_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED_LOCK);
+}
+
+void quic_connection_set_resumed_changed_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_RESUMED_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_RESUMED = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_RESUMED_LOCK);
+}
+
+void quic_connection_set_datagram_resumption_ticket_received_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED_LOCK);
+}
+
+void quic_connection_set_datagram_peer_certificate_received_event(quic_connection_event_context* ctx, uint8_t value) {
+  platform_lock(ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED_LOCK);
+  ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED = value;
+  platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED_LOCK);
 }
