@@ -107,5 +107,85 @@ actor QUICConnection is NotificationEmitter
   fun @connectionCallback(conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
     return _QUICConnectionCallback(conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag)
 
+  fun ref subscribeInternal(notify': Notify iso, once: Bool = false) =>
+    let subscribers': Subscribers = subscribers()
+    let notify'': Notify = consume notify'
+    try
+      subscribers'(notify'')?.push((notify'', once))
+    else
+      let arr: Subscriptions = Subscriptions(10)
+      arr.push((notify'', once))
+      subscribers'(notify'') =  arr
+    end
+    if subscriberCount(notify'') == 0 then
+      match notify''
+      | let notify''': ConnectedNotify =>
+        if subscriberCount(ConnectedEvent) == 0 then
+          ConnectedEvent._enable()
+        end
+      | let notify''': ShutdownInitiatedByTransportNotify =>
+        if subscriberCount(ShutdownInitiatedByTransportEvent) == 0 then
+          ShutdownInitiatedByTransportEvent._enable()
+        end
+      | let notify''': ShutdownInitiatedByPeerNotify =>
+        if subscriberCount(ShutdownInitiatedByPeerEvent) == 0 then
+          ShutdownInitiatedByPeerEvent._enable()
+        end
+      | let notify''': ShutdownCompleteNotify =>
+        if subscriberCount(ShutdownCompleteEvent) == 0 then
+          ShutdownCompleteEvent._enable()
+        end
+      | let notify''': LocalAddressChangedNotify =>
+        if subscriberCount(LocalAddressChangedEvent) == 0 then
+          LocalAddressChangedEvent._enable()
+        end
+      | let notify''': PeerAddressChangedNotify =>
+        if subscriberCount(PeerAddressChangedEvent) == 0 then
+          PeerAddressChangedEvent._enable()
+        end
+      | let notify''': PeerStreamStartedNotify =>
+        if subscriberCount(PeerStreamStartedEvent) == 0 then
+          PeerStreamStartedEvent._enable()
+        end
+      | let notify''': StreamsAvailableNotify =>
+        if subscriberCount(StreamsAvailableEvent) == 0 then
+          StreamsAvailableEvent._enable()
+        end
+      | let notify''': PeerNeedsStreamsNotify =>
+        if subscriberCount(PeerNeedsStreamsEvent) == 0 then
+          PeerNeedsStreamsEvent._enable()
+        end
+      | let notify''': IdealProcessorChangedNotify =>
+        if subscriberCount(IdealProcessorChangedEvent) == 0 then
+          IdealProcessorChangedEvent._enable()
+        end
+      | let notify''':  DatagramStateChangedNotify =>
+        if subscriberCount( DatagramStateChangedEvent) == 0 then
+           DatagramStateChangedEvent._enable()
+        end
+      | let notify''': DatagramReceivedNotify =>
+        if subscriberCount(DatagramReceivedEvent) == 0 then
+          DatagramReceivedEvent._enable()
+        end
+      | let notify''': DatagramSendStateChangedNotify =>
+        if subscriberCount(DatagramSendStateChangedEvent) == 0 then
+          DatagramSendStateChangedEvent._enable()
+        end
+      | let notify''': ResumedNotify =>
+        if subscriberCount(ResumedEvent) == 0 then
+          ResumedEvent._enable()
+        end
+      | let notify''': ResumptionTicketReceivedNotify =>
+        if subscriberCount(ResumptionTicketReceivedEvent) == 0 then
+          ResumptionTicketReceivedEvent._enable()
+        end
+      | let notify''': PeerCertificateReceivedNotify =>
+        if subscriberCount(PeerCertificateReceivedEvent) == 0 then
+          PeerCertificateReceivedEvent._enable()
+        end
+      end
+    end
+
+
   fun _final()=>
     @quic_free_connection_event_context(_ctx)

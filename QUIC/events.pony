@@ -32,6 +32,7 @@ primitive ConnectedEvent is ConnectedNotify
     @quic_connection_set_connected_event(ctx, 1)
   fun ref _disable(ctx: Pointer[None] tag) =>
     @quic_connection_set_connected_event(ctx, 0)
+
 trait ShutdownInitiatedByTransportNotify is PayloadNotify[ShutdownInitiatedByTransportData val]
   fun ref apply(data: ShutdownInitiatedByTransportData)
   fun box hash(): USize =>
@@ -182,7 +183,7 @@ trait ResumedNotify is PayloadNotify[ResumedData val]
   fun box hash(): USize =>
     QUICHashspace() + 14
 
-primitive ResumedChangedEvent is ResumedNotify
+primitive ResumedEvent is ResumedNotify
   fun ref apply(data: ResumedData) => None
   fun ref _enable(ctx: Pointer[None] tag) =>
     @quic_connection_set_resumed_changed_event(ctx, 1)
@@ -190,7 +191,7 @@ primitive ResumedChangedEvent is ResumedNotify
     @quic_connection_set_resumed_changed_event(ctx, 0)
 
 trait ResumptionTicketReceivedNotify is PayloadNotify[Array[U8] val]
-  fun ref apply(data: ResumedData) => None
+  fun ref apply(data: Array[U8] val) => None
   fun box hash(): USize =>
     QUICHashspace() + 15
 
