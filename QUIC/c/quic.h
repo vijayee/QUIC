@@ -62,10 +62,7 @@ void quic_server_listener_close(HQUIC* listener);
 void quic_cache_set(void* key, void* value);
 void* quic_cache_get(void* key);
 void quic_cache_delete(void* key);
-void* quic_server_actor(quic_server_event_context* ctx);
-HQUIC* quic_server_configuration(quic_server_event_context* ctx);
 
-typedef quic_cache_get quic_connection_actor;
 typedef quic_cache_get quic_stream_actor;
 HQUIC* quic_receive_connection(QUIC_LISTENER_EVENT* event);
 void quic_connection_set_configuration(HQUIC* connection, HQUIC* configuration);
@@ -204,6 +201,11 @@ struct {
   #endif
 } quic_connection_event_context;
 
+void* quic_server_actor(quic_server_event_context* ctx);
+HQUIC* quic_server_configuration(quic_server_event_context* ctx);
+
+void* quic_connection_actor(quic_connection_event_context* ctx);
+
 quic_connection_event_context* quic_new_connection_event_context();
 void quic_connection_event_context_set_actor(quic_connection_event_context* ctx, void* connectionActor);
 
@@ -226,3 +228,7 @@ void quic_connection_set_datagram_send_state_changed_event(quic_connection_event
 void quic_connection_set_resumed_changed_event(quic_connection_event_context* ctx, uint8_t value);
 void quic_connection_set_datagram_resumption_ticket_received_event(quic_connection_event_context* ctx, uint8_t value);
 void quic_connection_set_datagram_peer_certificate_received_event(quic_connection_event_context* ctx, uint8_t value);
+uint8_t quic_connection_event_enabled(quic_connection_event_context* ctx, QUIC_CONNECTION_EVENT* event);
+uint8_t quic_connection_connected_event_session_resumed(QUIC_CONNECTION_EVENT* event);
+uint8_t quic_connection_connected_event_session_negotiated_alpn_length(QUIC_CONNECTION_EVENT* event);
+void quic_connection_connected_event_session_negotiated_alpn_data(QUIC_CONNECTION_EVENT* event, uint8_t* buffer);

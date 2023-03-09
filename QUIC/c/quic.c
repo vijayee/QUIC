@@ -730,3 +730,68 @@ void quic_connection_set_datagram_peer_certificate_received_event(quic_connectio
   ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED_LOCK);
 }
+
+uint8_t quic_connection_connected_event_session_resumed(QUIC_CONNECTION_EVENT* event) {
+  return (uint8_t) event->CONNECTED.SessionResumed;
+}
+
+uint8_t quic_connection_connected_event_session_negotiated_alpn_length(QUIC_CONNECTION_EVENT* event) {
+  return event->CONNECTED.NegotiatedAlpnLength;
+}
+
+void quic_connection_connected_event_session_negotiated_alpn_data(QUIC_CONNECTION_EVENT* event, uint8_t* buffer) {
+  memcopy(buffer, event->CONNECTED.NegotiatedAlpn, (size_t)event->CONNECTED.NegotiatedAlpnLength)
+}
+
+uint8_t quic_connection_event_enabled(quic_connection_event_context* ctx, QUIC_CONNECTION_EVENT* event) {
+  switch (event->Type) {
+    case QUIC_CONNECTION_EVENT_CONNECTED:
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_CONNECTED_LOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_CONNECTED;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_CONNECTED_LOCK);
+        return value;
+        break;
+    case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
+        uint8_t value = 0;
+        platform_lock(ctx->SHUTDOWN_INITIATED_BY_TRANSPORT_LOCK);
+        value = ctx->SHUTDOWN_INITIATED_BY_TRANSPORT;
+        platform_unlock(ctx->SHUTDOWN_INITIATED_BY_TRANSPORT_LOCK);
+        return value;
+        break;
+    case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
+        //
+        // The connection was explicitly shut down by the peer.
+        //
+        printf("[conn][%p] Shut down by peer, 0x%llu\n", Connection, (unsigned long long)Event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode);
+        break;
+    case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
+        //
+        // The connection has completed the shutdown process and is ready to be
+        // safely cleaned up.
+        //
+        printf("[conn][%p] All done\n", Connection);
+        if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress) {
+            MsQuic->ConnectionClose(Connection);
+        }
+        break;
+    case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
+        //
+        // A resumption ticket (also called New Session Ticket or NST) was
+        // received from the server.
+        //
+        printf("[conn][%p] Resumption ticket received (%u bytes):\n", Connection, Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
+        for (uint32_t i = 0; i < Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength; i++) {
+            printf("%.2X", (uint8_t)Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket[i]);
+        }
+        printf("\n");
+        break;
+    default:
+        break;
+    }
+    return QUIC_STATUS_SUCCESS;
+}
+
+void* quic_connection_actor(quic_connection_event_context* ctx) {
+  return ctx->connectionActor;
+}

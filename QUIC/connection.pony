@@ -1,5 +1,6 @@
-
-use @quic_connection_actor[QUICConnection](key: Pointer[None] tag)?
+use @pony_alloc[Pointer[U8]](ctx: Pointer[None], size: USize)
+use @pony_ctx[Pointer[None]]()
+use @quic_connection_actor[QUICConnection](ctx: Pointer[None] tag)?
 use @quic_get_connection_event_type_as_uint[U8](event: Pointer[None] tag)
 use @quic_receive_stream[Pointer[None] tag](event: Pointer[None] tag)
 use @quic_receive_stream_type[U8](event: Pointer[None] tag)
@@ -7,14 +8,27 @@ use @quic_cache_set[None](key: Pointer[None] tag, value: Pointer[None] tag)?
 use @quic_stream_actor[QUICStream](key: Poiner[None] tag)?
 use @quic_connection_open[Pointer[None] tag](registration: Pointer[None] tag, callback:Pointer[None] tag)?
 use @quic_free_connection_event_context[None](ctx: Pointer[None] tag)
+use @quic_connection_event_enabled[U8](ctx: Pointer[None] tag, event: Pointer[None] tag)
+use @quic_connection_connected_event_session_negotiated_alpn_length[U8](event: Pointer[None] tag)
+use @quic_connection_connected_event_session_resumed[U8](event: Pointer[None] tag)
+use @quic_connection_connected_event_session_negotiated_alpn_data[None](event: Pointer[None] tag, buffer: Pointer[U8] tag)
 
 primitive _QUICConnectionCallback(cb: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
   try
-    let connection: QUICConnection = @quic_connection_actor(cb)?
+    let connection: QUICConnection = @quic_connection_actor(context)?
     match  @quic_get_connection_event_type_as_uint(event)
       //QUIC_CONNECTION_EVENT_CONNECTED
       | 0 =>
         @quic_send_resumption_ticket(conn)
+        if @quic_connection_event_enabled(context, event) == 1 then
+          let alpnLength: U8 = @quic_connection_connected_event_session_negotiated_alpn_length(event)
+          let sessionResumed: Bool = @quic_connection_connected_event_session_resumed(event) == 1
+          let ponyBuffer: Pointer[None] tag = @pony_alloc(@pony_ctx(), alpLength.usize())
+          @quic_connection_connected_event_session_negotiated_alpn_data(event, ponyBuffer)
+          let alpn: Array[U8] iso = recover Array[U8].from_cpointer(ponyBuffer) end
+          let data: ConnectionEventData = ConnectionEventData(sesionResumed, consume alpn)
+          connection._dispatchConnected(data)
+        end
       //QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT
       | 1 =>
         connection._dispatchShutdown()
@@ -185,6 +199,9 @@ actor QUICConnection is NotificationEmitter
         end
       end
     end
+
+    be _dispatchConnected(data: ConnectedData) =>
+      notifyPayload(data)
 
 
   fun _final()=>
