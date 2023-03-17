@@ -45,13 +45,13 @@ primitive ShutdownInitiatedByTransportEvent is ShutdownInitiatedByTransportNotif
   fun ref _disable(ctx: Pointer[None] tag) =>
     @quic_connection_set_shutdown_initiated_by_transport_event(ctx, 0)
 
-trait ShutdownInitiatedByPeerNotify is PayloadNotify[Exception]
-  fun ref apply(data: Exception)
+trait ShutdownInitiatedByPeerNotify is PayloadNotify[U64]
+  fun ref apply(data: U64)
   fun box hash(): USize =>
     QUICHashspace() + 3
 
 primitive ShutdownInitiatedByPeerEvent is ShutdownInitiatedByPeerNotify
-  fun ref apply(data: Exception) => None
+  fun ref apply(data: U64) => None
   fun ref _enable(ctx: Pointer[None] tag) =>
     @quic_connection_set_shutdown_initiated_by_peer_event(ctx, 1)
   fun ref _disable(ctx: Pointer[None] tag) =>

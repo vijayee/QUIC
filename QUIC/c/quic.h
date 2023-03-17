@@ -67,7 +67,7 @@ typedef quic_cache_get quic_stream_actor;
 HQUIC* quic_receive_connection(QUIC_LISTENER_EVENT* event);
 void quic_connection_set_configuration(HQUIC* connection, HQUIC* configuration);
 void quic_connection_set_callback(HQUIC* connection, void* connectionCallback);
-uint8_t quic_get_connection_event_type_as_uint(QUIC_LISTENER_EVENT* event);
+uint32_t quic_get_connection_event_type_as_uint(QUIC_LISTENER_EVENT* event);
 void quic_send_resumption_ticket(HQUIC* connection);
 void quic_close_connection(HQUIC* connection);
 HQUIC* quic_receive_stream(QUIC_CONNECTION_EVENT* event);
@@ -78,14 +78,14 @@ uint32_t quic_stream_status_pending();
 uint64_t quic_stream_get_total_buffer_length(QUIC_STREAM_EVENT* event);
 void quic_stream_get_total_buffer(QUIC_STREAM_EVENT* event, uint8_t* buffer, HQUIC* stream);
 
-struct {
+struct quic_server_event_context {
   void*  serverActor;
   HQUIC* configuration;
-} quic_server_event_context;
+};
 
 quic_server_event_context* quic_new_server_event_context(void* serverActor, HQUIC* configuration);
 
-struct {
+struct  quic_connection_event_context {
   void* connectionActor;
   uint8_t QUIC_CONNECTION_EVENT_CONNECTED;
   #if __linux__
@@ -199,7 +199,7 @@ struct {
   #if _WIN32
     CRITICAL_SECTION QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED_LOCK;
   #endif
-} quic_connection_event_context;
+};
 
 void* quic_server_actor(quic_server_event_context* ctx);
 HQUIC* quic_server_configuration(quic_server_event_context* ctx);
@@ -232,3 +232,19 @@ uint8_t quic_connection_event_enabled(quic_connection_event_context* ctx, QUIC_C
 uint8_t quic_connection_connected_event_session_resumed(QUIC_CONNECTION_EVENT* event);
 uint8_t quic_connection_connected_event_session_negotiated_alpn_length(QUIC_CONNECTION_EVENT* event);
 void quic_connection_connected_event_session_negotiated_alpn_data(QUIC_CONNECTION_EVENT* event, uint8_t* buffer);
+SHUTDOWN_INITIATED_BY_PEER quic_connection_shutdown_initiated_by_transport_data(QUIC_CONNECTION_EVENT* event);
+uint64_t quic_connection_shutdown_initiated_by_peer_data(QUIC_CONNECTION_EVENT* event);
+struct shutdown_complete_data {
+  uint8_t handshakeCompleted;
+  uint8_t peerAcknowledgedShutdown;
+  uint8_t appCloseInProgress;
+};
+void quic_connection_shutdown_complete_data(QUIC_CONNECTION_EVENT* event, shutdown_complete_data* data);
+QUIC_ADDR* quic_connection_event_local_address_changed_data(QUIC_CONNECTION_EVENT* event);
+QUIC_ADDR* quic_connection_event_peer_address_changed_data(QUIC_CONNECTION_EVENT* event);
+
+struct streams_available_data {
+  uint16_t bidirectionalCount;
+  uint16_t UnidirectionalCount;
+};
+void quic_connect_event_streams_available_data(QUIC_CONNECTION_EVENT* event, streams_available_data* data);

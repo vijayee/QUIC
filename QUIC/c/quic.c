@@ -507,8 +507,8 @@ HQUIC* quic_server_listener_open(HQUIC* registration, void* serverListenerCallba
   return listener;
 }
 
-uint8_t quic_get_connection_event_type_as_uint(QUIC_LISTENER_EVENT* event) {
-  return (uint8_t) event->Type;
+uint32_t quic_get_connection_event_type_as_uint(QUIC_LISTENER_EVENT* event) {
+  return (uint32_t) event->Type;
 }
 
 void quic_send_resumption_ticket(HQUIC* connection) {
@@ -760,20 +760,39 @@ uint8_t quic_connection_event_enabled(quic_connection_event_context* ctx, QUIC_C
         return value;
         break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
-        //
-        // The connection was explicitly shut down by the peer.
-        //
-        printf("[conn][%p] Shut down by peer, 0x%llu\n", Connection, (unsigned long long)Event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode);
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER_LOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER_LOCK);
+        return value;
         break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
-        //
-        // The connection has completed the shutdown process and is ready to be
-        // safely cleaned up.
-        //
-        printf("[conn][%p] All done\n", Connection);
-        if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress) {
-            MsQuic->ConnectionClose(Connection);
-        }
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE_LOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE_LOCK);
+        return value;
+        break;
+    case QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED:
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED_LOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED_LOCK);
+        return value;
+        break;
+    case QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED:
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED_LOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED_LOCK);
+        return value;
+        break;
+    case QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE:
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE_LOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_STREAMS_AVAILABLED;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE_LOCK);
+        return value;
         break;
     case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
         //
@@ -787,11 +806,43 @@ uint8_t quic_connection_event_enabled(quic_connection_event_context* ctx, QUIC_C
         printf("\n");
         break;
     default:
+        return 0;
         break;
     }
-    return QUIC_STATUS_SUCCESS;
+    return 0;
 }
 
 void* quic_connection_actor(quic_connection_event_context* ctx) {
   return ctx->connectionActor;
+}
+
+SHUTDOWN_INITIATED_BY_PEER quic_connection_shutdown_initiated_by_transport_data(QUIC_CONNECTION_EVENT* event) {
+  return event->SHUTDOWN_INITIATED_BY_TRANSPORT;
+}
+
+uint64_t quic_connection_shutdown_initiated_by_peer_data(QUIC_CONNECTION_EVENT* event) {
+  return event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode;
+}
+
+void quic_connection_shutdown_complete_data(QUIC_CONNECTION_EVENT* event, shutdown_complete_data* data) {
+  uint8_t* eventData =  (uint8_t*) event->SHUTDOWN_COMPLETE;
+  data->handshakeCompleted = (*eventData >> 0) & 0x01;
+  data->peerAcknowledgedShutdown = (*eventData >> 1) & 0x01;
+  data->appCloseInProgress = (*eventData >> 2) & 0x01;
+}
+
+QUIC_ADDR* quic_connection_event_local_address_changed_data(QUIC_CONNECTION_EVENT* event) {
+  QUIC_ADDR* addr= malloc(sizeof(event->LOCAL_ADDRESS_CHANGED.Address));
+  memcopy(addr, event->LOCAL_ADDRESS_CHANGED.Address, sizeof(event->LOCAL_ADDRESS_CHANGED.Address));
+  return addr;
+}
+
+QUIC_ADDR* quic_connection_event_peer_address_changed_data(QUIC_CONNECTION_EVENT* event) {
+  QUIC_ADDR* addr= malloc(sizeof(event->PEER_ADDRESS_CHANGED.Address));
+  memcopy(addr, event->PEER_ADDRESS_CHANGED.Address, sizeof(event->PEER_ADDRESS_CHANGED.Address));
+  return addr;
+}
+void quic_connect_event_streams_available_data(QUIC_CONNECTION_EVENT* event, streams_available_data* data) {
+  data->bidirectionalCount = event->STREAMS_AVAILABLE.BidirectionalCount;
+  data->unidirectionalCount = event->STREAMS_AVAILABLE.UnidirectionalCount;
 }
