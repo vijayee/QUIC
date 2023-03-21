@@ -142,8 +142,8 @@ primitive IdealProcessorChangedEvent is PeerNeedsStreamsNotify
   fun ref _disable(ctx: Pointer[None] tag) =>
     @quic_connection_set_ideal_processor_changed_event(ctx, 0)
 
-trait DatagramStateChangedNotify is PayloadNotify[DatagramStateChangedData val]
-  fun ref apply(data: DatagramStateChangedData) => None
+trait DatagramStateChangedNotify is PayloadNotify[QUICDatagramSendState]
+  fun ref apply(data: QUICDatagramSendState) => None
   fun box hash(): USize =>
     QUICHashspace() + 11
 
@@ -202,13 +202,13 @@ primitive ResumptionTicketReceivedEvent is ResumptionTicketReceivedNotify
   fun ref _disable(ctx: Pointer[None] tag) =>
     @quic_connection_set_datagram_resumption_ticket_received_event(ctx, 0)
 
-trait PeerCertificateReceivedNotify is PayloadNotify[QUICCertificate]
-  fun ref apply(data: QUICCertificate) => None
+trait PeerCertificateReceivedNotify is VoidNotify
+  fun ref apply()
   fun box hash(): USize =>
     QUICHashspace() + 16
 
 primitive PeerCertificateReceivedEvent is PeerCertificateReceivedNotify
-  fun ref apply(data: Array[U8] val) => None
+  fun ref apply() => None
   fun ref _enable(ctx: Pointer[None] tag) =>
     @quic_connection_set_datagram_peer_certificate_received_event(ctx, 1)
   fun ref _disable(ctx: Pointer[None] tag) =>

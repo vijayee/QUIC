@@ -4,7 +4,7 @@ class ConnectedData
   let negotiatedAlpn: Array[U8]
   new val create(sessionResumed': Bool, negotiatedAlpn': Array[U8] val) =>
     sessionResumed = sessionResumed'
-    negotiatedAlpn = negotiatedAlpn;
+    negotiatedAlpn = negotiatedAlpn'
 
 struct ShutdownInitiatedByTransportData
   var status: U32
@@ -23,5 +23,46 @@ class QUICAddress
     @quic_free(address)
 
 struct StreamsAvailableData
-  let bidirectionalCount: U16 = 0
-  let unidirectionalCount: U16 = 0
+  var bidirectionalCount: U16 = 0
+  var unidirectionalCount: U16 = 0
+
+struct DatagramStateChangedData
+  var sendEnabled: U8 = 0
+  var maxSendLength: U16 = 0
+
+primitive Unknown
+primitive Sent
+primitive LostSuspect
+primitive LostDiscarded
+primitive Acknowledged
+primitive AcknowledgedSpurious
+primitive Canceled
+
+type QUICDatagramSendState is (Unknown | Sent | LostSuspect | LostDiscarded | Acknowledged | AcknowledgedSpurious | Canceled)
+
+primitive ZeroRTT
+  fun apply(): U32 =>
+    0x0001
+
+primitive FIN
+  fun apply(): U32 =>
+    0x0002
+
+type QUICReceiveFlags is (None | ZeroRTT | FIN)
+
+class DatagramReceivedData
+  let flags : Array[QUICReceiveFlags] val
+  let buffer: Array[U8] val
+  new val create(flags': Array[QUICReceiveFlags] val, buffer': Array[U8] val) =>
+    flags= flags'
+    buffer= buffer'
+
+class ResumedData
+  var resumptionState: Array[U8] val
+  new val create(resumptionState': Array[U8] val) =>
+    resumptionState = resumptionsState'
+
+class ResumptionTicketReceivedData
+  let resumptionTicket: Array[U8] val
+  new val create(resumptionTicket': Array[U8] val) =>
+    resumptionTicket = resumptionTicket'

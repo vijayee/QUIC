@@ -787,23 +787,75 @@ uint8_t quic_connection_event_enabled(quic_connection_event_context* ctx, QUIC_C
         platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED_LOCK);
         return value;
         break;
+    case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED_LOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED_LOCK);
+        return value;
+        break;
     case QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE:
         uint8_t value = 0;
         platform_lock(ctx->QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE_LOCK);
-        value = ctx->QUIC_CONNECTION_EVENT_STREAMS_AVAILABLED;
+        value = ctx->QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE;
         platform_unlock(ctx->QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE_LOCK);
         return value;
         break;
+    case QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS:
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS_LOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS_LOCK);
+        return value;
+        break;
+    case QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED:
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED_LOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED_LOCK);
+        return value;
+        break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED:
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED_LOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED_LOCK);
+        return value;
+        break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED:
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED_LOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED_LOCK);
+        return value;
+        break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED:
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED_LOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED_LOCK);
+        return value;
+        break;
+    case QUIC_CONNECTION_EVENT_RESUMED:
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_RESUMED_LOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_RESUMED;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_RESUMED_LOCK);
+        return value;
+        break;
     case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
-        //
-        // A resumption ticket (also called New Session Ticket or NST) was
-        // received from the server.
-        //
-        printf("[conn][%p] Resumption ticket received (%u bytes):\n", Connection, Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
-        for (uint32_t i = 0; i < Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength; i++) {
-            printf("%.2X", (uint8_t)Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket[i]);
-        }
-        printf("\n");
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED_LOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED_LOCK);
+        return value;
+        break;
+    case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
+        uint8_t value = 0;
+        platform_lock(ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVEDLOCK);
+        value = ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED;
+        platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED_LOCK);
+        return value;
         break;
     default:
         return 0;
@@ -845,4 +897,47 @@ QUIC_ADDR* quic_connection_event_peer_address_changed_data(QUIC_CONNECTION_EVENT
 void quic_connect_event_streams_available_data(QUIC_CONNECTION_EVENT* event, streams_available_data* data) {
   data->bidirectionalCount = event->STREAMS_AVAILABLE.BidirectionalCount;
   data->unidirectionalCount = event->STREAMS_AVAILABLE.UnidirectionalCount;
+}
+
+uint8_t quic_connect_event_peer_needs_streams_data(QUIC_CONNECTION_EVENT* event) {
+  return (uint8_t)event->PEER_NEEDS_STREAMS.Bidirectional;
+}
+
+uint16_t quic_connect_event_ideal_processor_changed_data(QUIC_CONNECTION_EVENT* event) {
+  return event->IDEAL_PROCESSOR_CHANGED.IdealProcessor;
+}
+
+uint32_t quic_connection_event_datagram_send_state_changed_data(QUIC_CONNECTION_EVENT* event) {
+  return (uint32_t) event->DATAGRAM_SEND_STATE_CHANGED.State;
+}
+
+uint32_t quic_connection_event_datagram_received_flags(QUIC_CONNECTION_EVENT* event) {
+  return (uint32_t) event->DATAGRAM_RECEIVED.Flags;
+}
+
+uint32_t quic_connection_event_datagram_received_buffer_length(QUIC_CONNECTION_EVENT* event) {
+  return event->DATAGRAM_RECEIVED.Buffer->Length;
+}
+
+void quic_connection_event_datagram_received_buffer(QUIC_CONNECTION_EVENT* event, uint8_t* buffer) {
+  memcopy(buffer, event->DATAGRAM_RECEIVED.Buffer->Buffer, (size_t) event->DATAGRAM_RECEIVED.Buffer->Length);
+}
+void quic_connection_event_datagram_state_changed_data(QUIC_CONNECTION_EVENT* event, datagram_state_changed_data* data) {
+  data->sendEnabled = (uint8_t) event->DATAGRAM_STATE_CHANGED.SendEnabled;
+  data->maxSendLength = event->DATAGRAM_STATE_CHANGED.MaxSendLength;
+}
+
+uint16_t quic_connection_event_resumed_resumption_state_length(QUIC_CONNECTION_EVENT* event) {
+  return event->RESUMED.ResumptionStateLength;
+}
+
+void quic_connection_event_resumed_resumption_state_buffer(QUIC_CONNECTION_EVENT* event, uint8_t* buffer) {
+  memcopy(buffer, event->RESUMED.ResumptionState, (size_t) event->RESUMED.ResumptionStateLength);
+}
+
+uint32_t quic_connection_event_resumption_ticket_received_resumption_ticket_length(QUIC_CONNECTION_EVENT* event) {
+  return event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength;
+}
+void quic_connection_event_resumption_ticket_received_resumption_ticket(QUIC_CONNECTION_EVENT* event, uint8_t* buffer) {
+  memcopy(buffer, event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket, (size_t) event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
 }

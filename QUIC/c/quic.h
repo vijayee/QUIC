@@ -245,6 +245,18 @@ QUIC_ADDR* quic_connection_event_peer_address_changed_data(QUIC_CONNECTION_EVENT
 
 struct streams_available_data {
   uint16_t bidirectionalCount;
-  uint16_t UnidirectionalCount;
+  uint16_t unidirectionalCount;
 };
-void quic_connect_event_streams_available_data(QUIC_CONNECTION_EVENT* event, streams_available_data* data);
+void quic_connection_event_streams_available_data(QUIC_CONNECTION_EVENT* event, streams_available_data* data);
+uint8_t quic_connection_event_peer_needs_streams_data(QUIC_CONNECTION_EVENT* event);
+uint16_t quic_connection_event_ideal_processor_changed_data(QUIC_CONNECTION_EVENT* event);
+uint32_t quic_connection_event_datagram_send_state_changed_data(QUIC_CONNECTION_EVENT* event);
+struct datagram_state_changed_data {
+  uint8_t sendEnabled;
+  uint16_t maxSendLength;
+};
+void quic_connection_event_datagram_state_changed_data(QUIC_CONNECTION_EVENT* event, datagram_state_changed_data* data);
+uint16_t quic_connection_event_resumed_resumption_state_length(QUIC_CONNECTION_EVENT* event);
+void quic_connection_event_resumed_resumption_state_buffer(QUIC_CONNECTION_EVENT* event, uint8_t* buffer);
+uint32_t quic_connection_event_resumption_ticket_received_resumption_ticket_length(QUIC_CONNECTION_EVENT* event);
+void quic_connection_event_resumption_ticket_received_resumption_ticket(QUIC_CONNECTION_EVENT* event, uint8_t* buffer);
