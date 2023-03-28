@@ -1,7 +1,7 @@
-#include <quic.h>
+#include <msquic.h>
+#include <stdlib.h>
 
 int main() {
-    void* config = quic_new_registration_config("test", 3);
-    void* registration = quic_new_registration(config);
+    printf("%lu", sizeof(QUIC_STREAM_EVENT_TYPE));
     return 0;
 }

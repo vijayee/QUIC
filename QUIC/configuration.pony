@@ -34,10 +34,10 @@ use @quic_new_settings[Pointer[None] tag](maxBytesPerKey: Pointer[U64] tag,
     mtuDiscoveryMissingProbeCount: Pointer[U8] tag,
     destCidUpdateIdleTimeoutMs: Pointer[U8] tag)
 use @quic_configuration_load_credential[None](configuration: Pointer[None] tag, credentials: Pointer[None] tag)?
--
+
 
 class QUICConfiguration
-  config: Pointer[None] tag
+  let config: Pointer[None] tag
   new create(registration: QUICRegistration, alpn: Array[String], settings: QUICSettings, credential: QUICCredential) ? =>
     let quicsettings: Pointer[None] tag = @quic_new_settings(
       try addressof (settings.maxBytesPerKey as U64) else Pointer[U64].create() end,
@@ -76,9 +76,9 @@ class QUICConfiguration
       try addressof (settings.mtuDiscoveryMissingProbeCount as U8) else Pointer[U8].create() end,
       try addressof (settings.destCidUpdateIdleTimeoutMs as U8) else Pointer[U8].create() end
       )
-      let alpn': Array[Pointer[U8] tag] = Array[Pointer[U8] tag]
+      let alpn': Array[QUICBuffer] = Array[QUICBuffer](alpn.length)
       for app in alpn.values() do
-        alpn'.push(app.cstring())
+        alpn'.push(QUICBuffer(app.size().u32(), app.cstring()))
       end
       try
         config = @quic_new_configuration(registration.registration, alpn'.cpointer(), alpn.size().u32(), quicsettings)?
@@ -88,3 +88,6 @@ class QUICConfiguration
       else
         @quic_free(quicsettings)
       end
+    fun _final() =>
+      //TODO:Is this NEEDED!??!
+      None

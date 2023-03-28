@@ -1,4 +1,6 @@
-use "streams"
+use "Streams"
+use "Exception"
+use @quic_free[None](ptr: Pointer[None] tag)
 actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
   var _readable: Bool = true
   var _isDestroyed: Bool = false
@@ -6,9 +8,14 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
   var _pipeNotifiers': (Array[Notify tag] iso | None) = None
   var _isPiped: Bool = false
   let _auto: Bool = false
+  let _ctx: Pointer[None] tag
 
-  new create() =>
+  new create(ctx: Pointer[None] tag) =>
     _subscribers' = Subscribers(3)
+    _ctx = ctx
+
+  fun _final() =>
+    @quic_free(_ctx)
 
   fun readable(): Bool =>
     _readable
@@ -29,17 +36,20 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
     _subscribers'
 
   be _receive(event: Pointer[None] tag) =>
-    let data Array[U8] iso = recover
+    let data: Array[U8] iso = recover
       let size: U64 = @quic_stream_get_total_buffer_length(event)
       let buffer: Pointer[U8] = @pony_alloc(@pony_ctx(), size.usize())
+      @quic_stream_get_total_buffer(event, buffer, stream)
       let data' = Array.cpointer(buffer, size)
       data'
     end
+    notifyData(consume data)
 
   be push() =>
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
     else
+      None
       //notifyData(consume chunk)
     end
 
@@ -63,12 +73,12 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
         try
           if stop < _buffer.size() then
             let buf = Array[U8](_buffer.size() - stop)
-            for i in Range(stop, _buffer.size()) do
-              buf.push(_buffer(i)?)
+            for i' in Range(stop, _buffer.size()) do
+              buf.push(_buffer(i')?)
             end
             _buffer.clear()
-            for i in buf.values() do
-              _buffer.push(i)
+            for i'' in buf.values() do
+              _buffer.push(i'')
             end
           end
         else
@@ -162,15 +172,15 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
       end
 
       match notify''
-        | let notify''': DataNotify[R] =>
+        | let notify''': DataNotify[Array[U8] iso] =>
           if _buffer.size() > 0 then
             try
               data' = recover Array[U8](_buffer.size() + data.size()) end
-              for i in Range(_buffer.head(), _buffer.head() + _buffer.size()) do
-                data'.push(_buffer(i)?)
+              for i' in Range(_buffer.head(), _buffer.head() + _buffer.size()) do
+                data'.push(_buffer(i')?)
               end
-              for i in data.values() do
-                data'.push(i)
+              for i'' in data.values() do
+                data'.push(i'')
               end
               notify'''(consume data')
               _buffer.clear()
@@ -181,14 +191,14 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
             notify'''(consume data)
           end
         else
-          let overflow = for i in data.values() do
-            _buffer.push(i)
+          let overflow = for i' in data.values() do
+            _buffer.push(i')
           end
           if overflow then
             _notifyOverflow()
           end
       end
       if onces.size() > 0 then
-        discardOnces(subscribers'(DataKey[R])?, onces)
+        discardOnces(subscribers'(DataKey[Array[U8] iso])?, onces)
       end
     end

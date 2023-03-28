@@ -1,6 +1,10 @@
+use "Streams"
+use "Exception"
+use @quic_free[None](ptr: Pointer[None] tag)
 actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
   var _isDestroyed: Bool = false
   let _subscribers': Subscribers
+  let _ctx: Pointer[None] tag
 
   new create() =>
     _subscribers' = Subscribers(3)
@@ -11,11 +15,14 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
   fun destroyed(): Bool =>
     _isDestroyed
 
+  fun _final() =>
+    @quic_free(_ctx)
+
   be write(data: Array[U8] iso) =>
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
     else
-
+      None
     end
 
   be piped(stream: ReadablePushStream[Array[U8] iso] tag) =>

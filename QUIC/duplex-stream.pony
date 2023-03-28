@@ -1,19 +1,24 @@
 use "Streams"
 use "Exception"
 use "collections"
-use @quic_get_stream_event_type_as_uint[U8](event: Pointer[None] tag)
+use @quic_get_stream_event_type_as_uint[U32](event: Pointer[None] tag)
 use @quic_stream_get_total_buffer_length[U64](event: Pointer[None] tag)
 use @quic_stream_status_pending[U32]()
 use @pony_alloc[Pointer[U8]](ctx: Pointer[None], size: USize)
 use @pony_ctx[Pointer[None]]()
 use @quic_stream_get_total_buffer[None](event: Pointer[None] tag, buffer: Pointer[U8] tag, stream: Pointer[None] tag)
-type QUICStream (QUICDuplexStream | QUICReadableStream | QUICWriteableStream)
+use @quic_stream_actor[QUICStream](ctx: Pointer[None] tag)
+use @quic_free[None](ptr: Pointer[None] tag)
+type QUICStream is (QUICDuplexStream | QUICReadableStream | QUICWriteableStream)
 
 
-primitive _QUICStreamCallback(strm: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag, stream: QUICStream) : U32 =>
+primitive _QUICStreamCallback
+  fun apply(strm: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag) : U32 =>
+  let stream: QUICStream = @quic_stream_actor(context)
   match @quic_get_stream_event_type_as_uint(event)
     //QUIC_STREAM_EVENT_START_COMPLETE
     | 0 =>
+      None
     //QUIC_STREAM_EVENT_RECEIVE
     | 1 =>
       match stream
@@ -40,18 +45,25 @@ primitive _QUICStreamCallback(strm: Pointer[None] tag, context: Pointer[None] ta
           return 1
       end
     | 3 =>
+      None
     //QUIC_STREAM_EVENT_PEER_SEND_ABORTED
     | 4 =>
+      None
     //QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED
     | 5 =>
+      None
     //QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
     | 6 =>
+      None
     //QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE
     | 7 =>
+      None
     //QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE
     | 8 =>
+      None
     //QUIC_STREAM_EVENT_PEER_ACCEPTED
     | 9 =>
+      None
   end
   return 0
 
@@ -64,10 +76,11 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
   var _isPiped: Bool = false
   let _stream: Pointer[None] tag
   let _buffer: RingBuffer[U8]
+  let _ctx: Pointer[None] tag
 
-  new create(stream = Pointer[None] tag) =>
+  new create(stream: Pointer[None] tag, ctx: Pointer[None] tag) =>
     _subscribers' = Subscribers(3)
-    _buffer: RingBuffer(128000)
+    _buffer = RingBuffer(128000)
 
   fun ref subscribers(): Subscribers=>
     _subscribers'
@@ -78,8 +91,11 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
   fun readable(): Bool =>
     _readable
 
+  fun _final() =>
+    @quic_free(_ctx)
+
   be _receive(event: Pointer[None] tag) =>
-    let data Array[U8] iso = recover
+    let data: Array[U8] iso = recover
       let size: U64 = @quic_stream_get_total_buffer_length(event)
       let buffer: Pointer[U8] = @pony_alloc(@pony_ctx(), size.usize())
       @quic_stream_get_total_buffer(event, buffer, stream)
@@ -93,6 +109,7 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
     else
+      None
       /*
       notifyData(consume chunk)
       if (_file.size() == _file.position()) then
@@ -107,6 +124,7 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
     else
+      None
     end
 
   be read(cb: {(Array[U8] iso)} val, size: (USize | None) = None) =>
@@ -273,15 +291,15 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
       end
 
       match notify''
-        | let notify''': DataNotify[R] =>
+        | let notify''': DataNotify[Array[U8] iso] =>
           if _buffer.size() > 0 then
             try
               data' = recover Array[U8](_buffer.size() + data.size()) end
-              for i in Range(_buffer.head(), _buffer.head() + _buffer.size()) do
-                data'.push(_buffer(i)?)
+              for i' in Range(_buffer.head(), _buffer.head() + _buffer.size()) do
+                data'.push(_buffer(i')?)
               end
-              for i in data.values() do
-                data'.push(i)
+              for i'' in data.values() do
+                data'.push(i'')
               end
               notify'''(consume data')
               _buffer.clear()
@@ -292,14 +310,14 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
             notify'''(consume data)
           end
         else
-          let overflow = for i in data.values() do
-            _buffer.push(i)
+          let overflow = for i' in data.values() do
+            _buffer.push(i')
           end
           if overflow then
             _notifyOverflow()
           end
       end
       if onces.size() > 0 then
-        discardOnces(subscribers'(DataKey[R])?, onces)
+        discardOnces(subscribers'(DataKey[Array[U8] iso])?, onces)
       end
     end

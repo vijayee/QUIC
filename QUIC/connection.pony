@@ -1,11 +1,13 @@
+use "Streams"
 use @pony_alloc[Pointer[U8]](ctx: Pointer[None], size: USize)
 use @pony_ctx[Pointer[None]]()
-use @quic_connection_actor[QUICConnection](ctx: Pointer[None] tag)?
+use @quic_connection_actor[QUICConnection](ctx: Pointer[None] tag)
 use @quic_get_connection_event_type_as_uint[U32](event: Pointer[None] tag)
 use @quic_receive_stream[Pointer[None] tag](event: Pointer[None] tag)
-use @quic_receive_stream_type[U8](event: Pointer[None] tag)
-use @quic_cache_set[None](key: Pointer[None] tag, value: Pointer[None] tag)?
-use @quic_stream_actor[QUICStream](key: Poiner[None] tag)?
+use @quic_receive_stream_type[U32](event: Pointer[None] tag)
+use @quic_stream_set_callback[None](stream: Pointer[None] tag, streamCallback: Pointer[None] tag, ctx: Pointer[None] tag)
+use @quic_stream_new_event_context[Pointer[None] tag]()
+use @quic_stream_event_context_set_actor[None](ctx: Pointer[None] tag, streamActor: Pointer[None] tag)
 use @quic_connection_open[Pointer[None] tag](registration: Pointer[None] tag, callback:Pointer[None] tag)?
 use @quic_free_connection_event_context[None](ctx: Pointer[None] tag)
 use @quic_connection_event_enabled[U8](ctx: Pointer[None] tag, event: Pointer[None] tag)
@@ -14,7 +16,7 @@ use @quic_connection_connected_event_session_resumed[U8](event: Pointer[None] ta
 use @quic_connection_connected_event_session_negotiated_alpn_data[None](event: Pointer[None] tag, buffer: Pointer[U8] tag)
 use @quic_connection_shutdown_initiated_by_transport_data[ShutdownInitiatedByTransportData](event: Pointer[None] tag)
 use @quic_connection_shutdown_initiated_by_peer_data[U64](event: Pointer[None] tag)
-use @quic_connection_shutdown_complete_data[None](event: Pointer[None] tag, data: Pointer[ShutdownCompleteData] tag);
+use @quic_connection_shutdown_complete_data[None](event: Pointer[None] tag, data: Pointer[ShutdownCompleteData] tag)
 use @quic_connection_event_local_address_changed_data[Pointer[None] tag](event: Pointer[None] tag)
 use @quic_connection_event_peer_address_changed_data[Pointer[None] tag](event: Pointer[None] tag)
 use @quic_connection_event_streams_available_data[None](event: Pointer[None] tag, data: Pointer[StreamsAvailableData])
@@ -30,9 +32,9 @@ use @quic_connection_event_resumed_resumption_state_buffer[None](event: Pointer[
 use @quic_connection_event_resumption_ticket_received_resumption_ticket_length[U32](event: Pointer[None] tag)
 use @quic_connection_event_resumption_ticket_received_resumption_ticket[None](event: Pointer[None] tag, buffer: Pointer[U8] tag)
 
-primitive _QUICConnectionCallback(cb: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
-  try
-    let connection: QUICConnection = @quic_connection_actor(context)?
+primitive _QUICConnectionCallback
+  fun apply (cb: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
+    let connection: QUICConnection = @quic_connection_actor(context)
     match  @quic_get_connection_event_type_as_uint(event)
       //QUIC_CONNECTION_EVENT_CONNECTED
       | 0 =>
@@ -55,7 +57,7 @@ primitive _QUICConnectionCallback(cb: Pointer[None] tag, context: Pointer[None] 
       //QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER
       | 2 =>
         if @quic_connection_event_enabled(context, event) == 1 then
-          let data: u64 = @quic_connection_shutdown_initiated_by_peer_data(event)
+          let data: U64 = @quic_connection_shutdown_initiated_by_peer_data(event)
           connection._dispatchShutdownInitiatedByPeerData(data)
         end
       //QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
@@ -86,22 +88,19 @@ primitive _QUICConnectionCallback(cb: Pointer[None] tag, context: Pointer[None] 
         end
       // QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED
       | 6 =>
-        let strm: Pointer[None] tag = @quic_receive_stream(event);
-        let stream: QUICStream = match quic_receive_stream_type(event)
-          | 1 => QUICReadableStream._create(strm)
+        let strm: Pointer[None] tag = @quic_receive_stream(event)
+        let ctx: Pointer[None] tag = @quic_stream_new_event_context()
+        let stream: QUICStream = match @quic_receive_stream_type(event)
+        | 1 => QUICReadableStream._create(strm, ctx)
         else
-          QUICDuplexStream._create(strm)
+          QUICDuplexStream._create(strm, ctx)
         end
-        let streamCallback =@{(strm: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag) =>
-          try
-            let stream: QUICStream = @quic_stream_actor(strm)?
-            return _QUICStreamCallback(strm, context, event, stream)
-          else
-            return 1
-          end
-          return
+        let streamCallback = @{(strm: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag) =>
+          return _QUICStreamCallback(strm, context, event)
         }
-        @quic_cache_set(strm, addressof stream)
+
+        @quic_stream_event_context_set_actor(ctx, addressof stream)
+        @quic_stream_set_callback(addressof stream, addressof streamCallback, ctx)
         connection._dispatchNewStream(stream)
        //QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE
       | 7 =>
@@ -151,7 +150,7 @@ primitive _QUICConnectionCallback(cb: Pointer[None] tag, context: Pointer[None] 
               if (flag and ZeroRTT()) == ZeroRTT() then
                 flags'.push(ZeroRTT)
               end
-              if (flag and FIN()) == FIN() the
+              if (flag and FIN()) == FIN() then
                 flags'.push(FIN)
               end
             end
@@ -201,9 +200,7 @@ primitive _QUICConnectionCallback(cb: Pointer[None] tag, context: Pointer[None] 
         end
     end
     return 0
-  else
-    return 1
-  end
+
 
 actor QUICConnection is NotificationEmitter
   let _connection: Pointer[None] tag
@@ -223,11 +220,11 @@ actor QUICConnection is NotificationEmitter
     streams = Array[QUICStream](3)
     connection = conn
 
-  be _receiveNewStream(connection: QUICConnection)
+  be _receiveNewStream(connection: QUICConnection) =>
     _connections.push(connection)
 
   fun @connectionCallback(conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
-    return _QUICConnectionCallback(conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag)
+    return _QUICConnectionCallback(conn, context, event)
 
   fun ref subscribeInternal(notify': Notify iso, once: Bool = false) =>
     let subscribers': Subscribers = subscribers()
@@ -341,13 +338,13 @@ actor QUICConnection is NotificationEmitter
     be _dispatchDatagramSendStateChanged(data: QUICDatagramSendState) =>
       notifyPayload[QUICDatagramSendState](DatagramStateChangedEvent, data)
 
-    be _dispatchDatagramSendStateChanged(data: ResumedData) =>
+    be _dispatchResumed(data: ResumedData) =>
       notifyPayload[ResumedData](ResumedEvent, data)
 
     be _dispatchResumptionTicketReceived(data: ResumptionTicketReceivedData val) =>
        notifyPayload[ResumptionTicketReceivedData val](ResumptionTicketReceivedEvent, data)
 
-    be _dispatchPeerCertificateReceived()
+    be _dispatchPeerCertificateReceived() =>
        notify(PeerCertificateReceivedEvent)
     be _dispatchClosed() =>
       notify(ClosedEvent)

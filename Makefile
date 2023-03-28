@@ -17,10 +17,11 @@ install: libponyquic
 	mkdir -p /usr/local/lib/NeatCrypto
 	cp build/lib/libponyquic.a /usr/local/lib/QUIC
 testlib:libponyquic
-		clang -v -o build/test/testlib QUIC/test/test.c  -IQUIC/c -Lbuild/lib -L$(MSQUICLIBPATH) -I$(PONYINCPATH) -I$(MSINCQUICPATH) -lponyrt -lmsquic -lponyquic #-I$(OPENSSLINCPATH)
+		clang -v -o build/test/testlib QUIC/test/test.c  #-IQUIC/c -Lbuild/lib -L$(MSQUICLIBPATH) -I$(PONYINCPATH) -I$(MSINCQUICPATH) -lponyrt -lmsquic -lponyquic #-I$(OPENSSLINCPATH)
 		./build/test/testlib
 test: libponyquic
-	ponyc  QUIC/test -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
+	corral fetch
+	corral run -- ponyc  QUIC/test -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
 	./build/test/test
 clean:
 	rm -rf build

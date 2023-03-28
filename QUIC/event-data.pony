@@ -10,7 +10,7 @@ struct ShutdownInitiatedByTransportData
   var status: U32
   var errorCode: U64
 
-struct ShutdowCompleteData
+struct ShutdownCompleteData
   var handshakeCompleted: Bool = false
   var peerAcknowledgedShutdown: Bool = false
   var appCloseInProgress: Bool = false
@@ -66,3 +66,10 @@ class ResumptionTicketReceivedData
   let resumptionTicket: Array[U8] val
   new val create(resumptionTicket': Array[U8] val) =>
     resumptionTicket = resumptionTicket'
+
+struct QUICBuffer
+  var length: U32 = 0
+  var buffer: Pointer[U8] tag = Pointer[U8]
+  new create(length': U32, buffer': Pointer[U8] tag) =>
+    length = length'
+    buffer = buffer'

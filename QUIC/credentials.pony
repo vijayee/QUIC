@@ -3,9 +3,9 @@ use @quic_certificate_file_protected[Pointer[None] tag](certificateFile: Pointer
 use @quic_certificate_pkcs12[Pointer[None]](Asn1Blob: Pointer[U8] tag, Asn1BlobLength: U32, privateKeyPassword: Pointer[U8] tag)
 use @quic_new_credential_config[Pointer[None] tag](credType: I32, flags: U64, cert: Pointer[None] tag, allowedCiphers: U8, caCertificateFile: Pointer[U8] tag)
 
-primitive QUICServer
+primitive Server
   fun apply(): U64 => 0x00000000
-primitive QUICClient
+primitive Client
   fun apply(): U64 => 0x00000001
 primitive NoCertificateValidation
   fun apply(): U64 => 0x00000004
@@ -36,8 +36,8 @@ primitive UsePortableCertificates
 primitive SetCACertificateFile
   fun apply(): U64 => 0x00100000
 
-type QUICCredentialFlag is  (QUICServer
-| QUICClient
+type QUICCredentialFlag is  (Server
+| Client
 | NoCertificateValidation
 | EnableOCSP
 | IndicateCertificateReceived

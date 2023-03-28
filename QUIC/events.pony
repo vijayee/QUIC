@@ -1,7 +1,7 @@
 use "Streams"
 use "Exception"
 
-use @quic_connection_set_connected_event[None](ctx: Pointer[None], uint8_t value)
+use @quic_connection_set_connected_event[None](ctx: Pointer[None], value: U8)
 use @quic_connection_set_shutdown_initiated_by_transport_event[None](ctx: Pointer[None], value: U8)
 use @quic_connection_set_shutdown_initiated_by_peer_event[None](ctx: Pointer[None], value: U8)
 use @quic_connection_set_shutdown_complete_event[None](ctx: Pointer[None], value: U8)
@@ -69,30 +69,30 @@ primitive ShutdownCompleteEvent is ShutdownCompleteNotify
   fun ref _disable(ctx: Pointer[None] tag) =>
     @quic_connection_set_shutdown_complete_event(ctx, 0)
 
-trait LocalAddressChangedNotify is ParyloadNotify[QUICAdressInfo val]
-  fun ref apply(data: QUICAdressInfo)
+trait LocalAddressChangedNotify is PayloadNotify[QUICAddress val]
+  fun ref apply(data: QUICAddress val)
   fun box hash(): USize =>
     QUICHashspace() + 5
 
 primitive LocalAddressChangedEvent is LocalAddressChangedNotify
-  fun ref apply(data: QUICAdressInfo) => None
+  fun ref apply(data: QUICAddress val) => None
   fun ref _enable(ctx: Pointer[None] tag) =>
     @quic_connection_set_local_address_changed_event(ctx, 1)
   fun ref _disable(ctx: Pointer[None] tag) =>
     @quic_connection_set_local_address_changed_event(ctx, 0)
 
-trait PeerAddressChangedNotify is PayloadNotify[QUICAdressInfo val]
-  fun ref apply(data: QUICAdressInfo) => None
+trait PeerAddressChangedNotify is PayloadNotify[QUICAddress val]
+  fun ref apply(data: QUICAddress) => None
   fun box hash(): USize =>
     QUICHashspace() + 6
 
 primitive PeerAddressChangedEvent is PeerAddressChangedNotify
-  fun ref apply(data: QUICAdressInfo) => None
+  fun ref apply(data: QUICAddress) => None
   fun ref _enable(ctx: Pointer[None] tag) =>
     @quic_connection_set_peer_address_changed_event(ctx, 1)
   fun ref _disable(ctx: Pointer[None] tag) =>
     @quic_connection_set_peer_address_changed_event(ctx, 0)
-
+/*
 trait PeerStreamStartedNotify is PayloadNotify[PeerStreamStartedData val]
   fun ref apply(data: PeerStreamStartedData) => None
   fun box hash(): USize =>
@@ -104,9 +104,9 @@ primitive PeerStreamStartedEvent is PeerStreamStartedNotify
     @quic_connection_set_peer_stream_started_event(ctx, 1)
   fun ref _disable(ctx: Pointer[None] tag) =>
     @quic_connection_set_peer_stream_started_event(ctx, 0)
-
+*/
 trait StreamsAvailableNotify is PayloadNotify[StreamsAvailableData val]
-  fun ref apply(data: PeerStreamStartedData) => None
+  fun ref apply(data: StreamsAvailableData) => None
   fun box hash(): USize =>
     QUICHashspace() + 8
 
@@ -142,37 +142,37 @@ primitive IdealProcessorChangedEvent is PeerNeedsStreamsNotify
   fun ref _disable(ctx: Pointer[None] tag) =>
     @quic_connection_set_ideal_processor_changed_event(ctx, 0)
 
-trait DatagramStateChangedNotify is PayloadNotify[QUICDatagramSendState]
-  fun ref apply(data: QUICDatagramSendState) => None
+trait DatagramStateChangedNotify is PayloadNotify[DatagramStateChangedData val]
+  fun ref apply(data: DatagramStateChangedData val) => None
   fun box hash(): USize =>
     QUICHashspace() + 11
 
 primitive DatagramStateChangedEvent is DatagramStateChangedNotify
-  fun ref apply(data: DatagramStateChanged) => None
+  fun ref apply(data: DatagramStateChangedData val) => None
   fun ref _enable(ctx: Pointer[None] tag) =>
     @quic_connection_set_datagram_state_changed_event(ctx, 1)
   fun ref _disable(ctx: Pointer[None] tag) =>
     @quic_connection_set_datagram_state_changed_event(ctx, 0)
 
 trait DatagramReceivedNotify is PayloadNotify[DatagramReceivedData val]
-  fun ref apply(data: DatagramReceivedData) => None
+  fun ref apply(data: DatagramReceivedData val) => None
   fun box hash(): USize =>
     QUICHashspace() + 12
 
 primitive DatagramReceivedEvent is DatagramReceivedNotify
-  fun ref apply(data: DatagramReceived) => None
+  fun ref apply(data: DatagramReceivedData val) => None
   fun ref _enable(ctx: Pointer[None] tag) =>
     @quic_connection_set_datagram_received_event(ctx, 1)
   fun ref _disable(ctx: Pointer[None] tag) =>
     @quic_connection_set_datagram_received_event(ctx, 0)
 
-trait DatagramSendStateChangedNotify is PayloadNotify[DatagramSendStateChangedData val]
-  fun ref apply(data: DatagramSendStateChangedData) => None
+trait DatagramSendStateChangedNotify is PayloadNotify[QUICDatagramSendState]
+  fun ref apply(data: QUICDatagramSendState) => None
   fun box hash(): USize =>
     QUICHashspace() + 13
 
 primitive DatagramSendStateChangedEvent is DatagramSendStateChangedNotify
-  fun ref apply(data: DatagramSendStateChangedDatal) => None
+  fun ref apply(data: QUICDatagramSendState) => None
   fun ref _enable(ctx: Pointer[None] tag) =>
     @quic_connection_set_datagram_send_state_changed_event(ctx, 1)
   fun ref _disable(ctx: Pointer[None] tag) =>
@@ -213,7 +213,7 @@ primitive PeerCertificateReceivedEvent is PeerCertificateReceivedNotify
     @quic_connection_set_datagram_peer_certificate_received_event(ctx, 1)
   fun ref _disable(ctx: Pointer[None] tag) =>
     @quic_connection_set_datagram_peer_certificate_received_event(ctx, 0)
-
+/*
 trait StartCompleteNotify is PayloadNotify[StartCompleteData]
   fun ref apply(data: StartCompleteData) => None
   fun box hash(): USize =>
@@ -246,12 +246,12 @@ trait SendShutdownCompleteNotify is PayloadNotify[Bool]
 primitive SendShutdownCompleteEvent is SendShutdownCompleteNotify
   fun ref apply(data: Array[U8] val) => None
 
-trait ShutdownCompleteNotify is PayloadNotify[Bool]
+trait StreamShutdownCompleteNotify is PayloadNotify[Bool]
   fun ref apply(data: Bool) => None
   fun box hash(): USize =>
     QUICHashspace() + 21
 
-primitive ShutdownCompleteEvent is SendShutdownCompleteNotify
+primitive StreamShutdownCompleteEvent is SendShutdownCompleteNotify
   fun ref apply(data: Bool) => None
 
 trait IdealSendBufferSizeNotify is PayloadNotify[U64]
@@ -261,3 +261,4 @@ trait IdealSendBufferSizeNotify is PayloadNotify[U64]
 
 primitive IdealSendBufferSizeEvent is IdealSendBufferSizeNotify
   fun ref apply(data: U64) => None
+*/

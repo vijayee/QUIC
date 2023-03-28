@@ -1,20 +1,17 @@
-use @quic_retrieve_actor[QUICServer](self)
 use @quic_is_new_connection_event[U8](event:Pointer[None] tag)
 use @quic_server_listener_open[Pointer[None] tag](registration: Pointer[None] tag, serverListenerCallback: Pointer[None] tag)?
 use @quic_server_listener_close[None](listener: Pointer[None] tag)
-use @quic_cache_set[None](key: Pointer[None] tag, value: Pointer[None] tag)?
-use @quic_cache_get[Pointer[None]](key: Pointer[None] tag)?;
-use @quic_server_configuration[Pointer[Noner]](ctx: Pointer[None] tag)
+use @quic_server_configuration[Pointer[None]](ctx: Pointer[None] tag)
 use @quic_server_actor[QUICServer](ctx: Pointer[None] tag)
 use @quic_receive_connection[Pointer[None] tag](event: Pointer[None] tag)
-use @quic_connection_set_configuration(connection: Pointer[None] tag, configuration: Pointer[None] tag)
+use @quic_connection_set_configuration[U32](connection: Pointer[None] tag, configuration: Pointer[None] tag)
 use @quic_send_resumption_ticket[None](connection: Pointer[None] tag)
 use @quic_connection_actor[QUICConnection](key: Pointer[None] tag)?
 use @quic_close_connection[None](connection: Pointer[None] tag)
 use @quic_connection_set_callback[None](connection: Pointer[None] tag, connectionCallback: Pointer[None] tag)
 use @quic_new_server_event_context[Pointer[None] tag](serverActor: Pointer[None] tag, configuration: Pointer[None] tag)
 use @quic_new_connection_event_context[Pointer[None] tag]()
-use @quic_connection_event_context_set_actor[None](ctx: Pointer[None] tag, connectionActor: Pointer[None] tag);
+use @quic_connection_event_context_set_actor[None](ctx: Pointer[None] tag, connectionActor: Pointer[None] tag)
 use @quic_free_connection_event_context[None](ctx: Pointer[None] tag)
 use "collections"
 use "Streams"
@@ -25,13 +22,13 @@ actor QUICServer is NotificationEmitter
   let _configuration: QUICConfiguration
   let _listener: Pointer[None] tag
   let _connections: Array[QUICConnection]
-  let ctx: Pointer[None] tag
+  let _ctx: Pointer[None] tag
   new create(registration: QUICRegistration, configuration: QUICConfiguration) =>
     _subscribers' = Subscribers
     _connections = Array[QUICConnection](10)
     try
-      ctx = @quic_new_server_event_context(addressof this, _configuration.config)
-      _listener = @quic_server_listener_open(registration, addressof this.@serverCallback, ctx)?
+      _ctx = @quic_new_server_event_context(addressof this, _configuration.config)
+      _listener = @quic_server_listener_open(registration, addressof this.serverCallback, _ctx)?
 
     else
       _listener = Pointer[None]()
@@ -39,7 +36,7 @@ actor QUICServer is NotificationEmitter
       None
     end
 
-  be _acceptNewConnection(connection: QUICConnection)
+  be _acceptNewConnection(connection: QUICConnection) =>
     _connections.push(connection)
 
   fun @serverCallback(ctx: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
@@ -52,7 +49,7 @@ actor QUICServer is NotificationEmitter
         let connectionCtx: Pointer[None] tag = @quic_new_connection_event_context[Pointer[None] tag](addressof connection)
         @quic_connection_event_context_set_actor(connectionCtx, addressof connection)
         let connectionCb = @{(conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
-          return _QUICConnectionCallback(conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag)
+          return _QUICConnectionCallback(conn, context, event)
         } val
 
         @quic_connection_set_callback(conn, addressof connectionCb, connectionCtx)
@@ -70,6 +67,6 @@ actor QUICServer is NotificationEmitter
     end
   fun _final() =>
     try
-      @quic_server_listener_close(_listener(_listener)
+      @quic_server_listener_close(_listener)
       @quic_free(_listener)
     end
