@@ -13,7 +13,7 @@ class QUICSettings
   var maxStatelessOperations: (U32 | None) = None
   var initialWindowPackets: (U32 | None) = None
   var sendIdleTimeoutMs: (U32 | None) = None
-  var innitialRttMs: (U32 | None) = None
+  var initialRttMs: (U32 | None) = None
   var maxAckDelayMs: (U32 | None) = None
   var disconnectTimeoutMs: (U32 | None) = None
   var keepAliveIntervalMs: (U32 | None) = None

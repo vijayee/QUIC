@@ -1,6 +1,7 @@
 use "Streams"
 use "Exception"
-use @quic_free[None](ptr: Pointer[None] tag)
+use "collections"
+
 actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
   var _readable: Bool = true
   var _isDestroyed: Bool = false
@@ -9,10 +10,14 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
   var _isPiped: Bool = false
   let _auto: Bool = false
   let _ctx: Pointer[None] tag
+  let _stream: Pointer[None] tag
+  let _buffer: RingBuffer[U8]
 
-  new create(ctx: Pointer[None] tag) =>
+  new _create(stream: Pointer[None] tag, ctx: Pointer[None] tag) =>
     _subscribers' = Subscribers(3)
     _ctx = ctx
+    _stream = stream
+    _buffer = RingBuffer[U8](128000)
 
   fun _final() =>
     @quic_free(_ctx)
@@ -37,10 +42,10 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
 
   be _receive(event: Pointer[None] tag) =>
     let data: Array[U8] iso = recover
-      let size: U64 = @quic_stream_get_total_buffer_length(event)
-      let buffer: Pointer[U8] = @pony_alloc(@pony_ctx(), size.usize())
-      @quic_stream_get_total_buffer(event, buffer, stream)
-      let data' = Array.cpointer(buffer, size)
+      let size: USize = @quic_stream_get_total_buffer_length(event).usize()
+      let buffer: Pointer[U8] = @pony_alloc(@pony_ctx(), size)
+      @quic_stream_get_total_buffer(event, buffer, _stream)
+      let data': Array[U8] = Array[U8].from_cpointer(buffer, size)
       data'
     end
     notifyData(consume data)
@@ -64,9 +69,9 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
       size' = size'.min(_buffer.size())
 
       let data = recover Array[U8](size') end
-      let stop = _buffer.head() + size'
       try
-        for i in Range(_buffer.head(), stop) do
+        let stop = _buffer.head()? + size'
+        for i in Range(_buffer.head()?, stop) do
           data.push(_buffer(i)?)
         end
         cb(consume data)
@@ -150,55 +155,4 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
       subscribers'.clear()
       _pipeNotifiers' = None
       _isPiped = false
-    end
-
-  fun ref notifyData(data: Array[U8] iso) =>
-    try
-      let subscribers': Subscribers  = subscribers()
-      var notify'': (DataNotify[Array[U8] iso] | None) =  None
-      let onces = Array[USize](subscribers'.size())
-
-      var i: USize = 0
-      for notify in subscribers'(DataKey[Array[U8] iso])?.values() do
-        match notify
-        |  (let notify': DataNotify[Array[U8] iso], let once: Bool) =>
-            notify'' = notify'
-            if once then
-              onces.push(i)
-            end
-            break
-        end
-        i = i + 1
-      end
-
-      match notify''
-        | let notify''': DataNotify[Array[U8] iso] =>
-          if _buffer.size() > 0 then
-            try
-              data' = recover Array[U8](_buffer.size() + data.size()) end
-              for i' in Range(_buffer.head(), _buffer.head() + _buffer.size()) do
-                data'.push(_buffer(i')?)
-              end
-              for i'' in data.values() do
-                data'.push(i'')
-              end
-              notify'''(consume data')
-              _buffer.clear()
-            else
-              notifyError(Exception("Error copying buffer"))
-            end
-          else
-            notify'''(consume data)
-          end
-        else
-          let overflow = for i' in data.values() do
-            _buffer.push(i')
-          end
-          if overflow then
-            _notifyOverflow()
-          end
-      end
-      if onces.size() > 0 then
-        discardOnces(subscribers'(DataKey[Array[U8] iso])?, onces)
-      end
     end

@@ -1,8 +1,3 @@
-use @quic_certificate_file[Pointer[None] tag](privateKeyFile: Pointer[U8] tag, certificateFile: Pointer[U8] tag)
-use @quic_certificate_file_protected[Pointer[None] tag](certificateFile: Pointer[U8] tag, privateKeyFile: Pointer[U8] tag, privateKeyPassword: Pointer[U8] tag)
-use @quic_certificate_pkcs12[Pointer[None]](Asn1Blob: Pointer[U8] tag, Asn1BlobLength: U32, privateKeyPassword: Pointer[U8] tag)
-use @quic_new_credential_config[Pointer[None] tag](credType: I32, flags: U64, cert: Pointer[None] tag, allowedCiphers: U8, caCertificateFile: Pointer[U8] tag)
-
 primitive Server
   fun apply(): U64 => 0x00000000
 primitive Client
@@ -36,7 +31,7 @@ primitive UsePortableCertificates
 primitive SetCACertificateFile
   fun apply(): U64 => 0x00100000
 
-type QUICCredentialFlag is  (Server
+type QUICCredentialsFlag is  (Server
 | Client
 | NoCertificateValidation
 | EnableOCSP
@@ -53,7 +48,7 @@ type QUICCredentialFlag is  (Server
 | UsePortableCertificates
 | SetCACertificateFile)
 
-type QUICCredentialFlags is Array[QUICCredentialFlag]
+type QUICCredentialsFlags is Array[QUICCredentialsFlag]
 
 primitive CipherSuiteNone
   fun apply(): U8 => 0x0
@@ -71,10 +66,10 @@ type QUICAllowedCipherSuiteFlag is (CipherSuiteNone
 
 type QUICAllowedCipherSuiteFlags is Array[QUICAllowedCipherSuiteFlag]
 
-class val QUICCredential
+class val QUICCredentials
   let cred: Pointer[None] tag
   let certificate: QUICCertificate
-  new create(certificate': QUICCertificate, flags': QUICCredentialFlags = [], allowedCipherSuiteFlags: QUICAllowedCipherSuiteFlags = [], caCertificateFile: (String | None) = None ) =>
+  new create(certificate': QUICCertificate, flags': QUICCredentialsFlags = [], allowedCipherSuiteFlags: QUICAllowedCipherSuiteFlags = [], caCertificateFile: (String | None) = None ) =>
     certificate = certificate'
     var flags: U64 = 0
     for flag in flags'.values() do

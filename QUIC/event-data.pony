@@ -1,19 +1,35 @@
-use @quic_free[None](ptr: Pointer[None] tag)
-class ConnectedData
+
+class val ConnectedData
   let sessionResumed: Bool
-  let negotiatedAlpn: Array[U8]
-  new val create(sessionResumed': Bool, negotiatedAlpn': Array[U8] val) =>
+  let negotiatedAlpn: Array[U8] val
+  new create(sessionResumed': Bool, negotiatedAlpn': Array[U8] val) =>
     sessionResumed = sessionResumed'
     negotiatedAlpn = negotiatedAlpn'
 
-struct ShutdownInitiatedByTransportData
-  var status: U32
-  var errorCode: U64
+struct _ShutdownInitiatedByTransportData
+  var status: U32 = 0
+  var errorCode: U64 = 0
 
-struct ShutdownCompleteData
+class val ShutdownInitiatedByTransportData
+  let status: U32
+  let errorCode: U64
+  new create(status': U32, errorCode': U64) =>
+    status = status'
+    errorCode = errorCode'
+
+struct _ShutdownCompleteData
   var handshakeCompleted: Bool = false
   var peerAcknowledgedShutdown: Bool = false
   var appCloseInProgress: Bool = false
+
+class val ShutdownCompleteData
+  let handshakeCompleted: Bool
+  let peerAcknowledgedShutdown: Bool
+  let appCloseInProgress: Bool
+  new create(handshakeCompleted': Bool, peerAcknowledgedShutdown': Bool, appCloseInProgress': Bool) =>
+    handshakeCompleted = handshakeCompleted'
+    peerAcknowledgedShutdown = peerAcknowledgedShutdown'
+    appCloseInProgress = appCloseInProgress'
 
 class QUICAddress
   let address: Pointer[None] tag
@@ -22,13 +38,27 @@ class QUICAddress
   fun _final() =>
     @quic_free(address)
 
-struct StreamsAvailableData
+struct _StreamsAvailableData
   var bidirectionalCount: U16 = 0
   var unidirectionalCount: U16 = 0
 
-struct DatagramStateChangedData
+class val StreamsAvailableData
+  let bidirectionalCount: U16
+  let unidirectionalCount: U16
+  new create(bidirectionalCount': U16, unidirectionalCount': U16) =>
+    bidirectionalCount = bidirectionalCount'
+    unidirectionalCount = unidirectionalCount'
+
+struct _DatagramStateChangedData
   var sendEnabled: U8 = 0
   var maxSendLength: U16 = 0
+
+class val DatagramStateChangedData
+  let sendEnabled: Bool
+  let maxSendLength: USize
+  new create(sendEnabled': Bool, maxSendLength': USize) =>
+    sendEnabled = sendEnabled'
+    maxSendLength = maxSendLength'
 
 primitive Unknown
 primitive Sent
@@ -54,17 +84,17 @@ class DatagramReceivedData
   let flags : Array[QUICReceiveFlags] val
   let buffer: Array[U8] val
   new val create(flags': Array[QUICReceiveFlags] val, buffer': Array[U8] val) =>
-    flags= flags'
-    buffer= buffer'
+    flags = flags'
+    buffer = buffer'
 
-class ResumedData
+class val ResumedData
   var resumptionState: Array[U8] val
-  new val create(resumptionState': Array[U8] val) =>
-    resumptionState = resumptionsState'
+  new create(resumptionState': Array[U8] val) =>
+    resumptionState = resumptionState'
 
-class ResumptionTicketReceivedData
+class val ResumptionTicketReceivedData
   let resumptionTicket: Array[U8] val
-  new val create(resumptionTicket': Array[U8] val) =>
+  new create(resumptionTicket': Array[U8] val) =>
     resumptionTicket = resumptionTicket'
 
 struct QUICBuffer

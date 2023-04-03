@@ -134,232 +134,145 @@ QUIC_CREDENTIAL_CONFIG* quic_new_credential_config(int32_t credType, uint64_t fl
   return cred;
 }
 
-QUIC_SETTINGS* quic_new_settings(uint64_t* maxBytesPerKey,
-  uint64_t* handshakeIdleTimeoutMs,
-  uint64_t* idleTimeoutMs,
-  uint64_t* mtuDiscoverySearchCompleteTimeoutUs,
-  uint32_t* tlsClientMaxSendBuffer,
-  uint32_t* tlsServerMaxSendBuffer,
-  uint32_t* streamRecvWindowDefault,
-  uint32_t* streamRecvBufferDefault,
-  uint32_t* connFlowControlWindow,
-  uint32_t* maxWorkerQueueDelayUs,
-  uint32_t* maxStatelessOperations,
-  uint32_t* initialWindowPackets,
-  uint32_t* sendIdleTimeoutMs,
-  uint32_t* initialRttMs,
-  uint32_t* maxAckDelayMs,
-  uint32_t* disconnectTimeoutMs,
-  uint32_t* keepAliveIntervalMs,
-  uint16_t* congestionControlAlgorithm,
-  uint16_t* peerBidiStreamCount,
-  uint16_t* peerUnidiStreamCount,
-  uint16_t* maxBindingStatelessOperations,
-  uint16_t* statelessOperationExpirationMs,
-  uint16_t* minimumMtu,
-  uint16_t* maximumMtu,
-  uint8_t* sendBufferingEnabled,
-  uint8_t* pacingEnabled,
-  uint8_t* migrationEnabled,
-  uint8_t* datagramReceiveEnabled,
-  uint8_t* serverResumptionLevel,
-  uint8_t* greaseQuicBitEnabled,
-  uint8_t* ecnEnabled,
-  uint8_t* maxOperationsPerDrain,
-  uint8_t* mtuDiscoveryMissingProbeCount,
-  uint32_t* destCidUpdateIdleTimeoutMs) {
+QUIC_SETTINGS* quic_new_settings(struct quic_setting_value_uint64_t maxBytesPerKey,
+  struct quic_setting_value_uint64_t handshakeIdleTimeoutMs,
+  struct quic_setting_value_uint64_t idleTimeoutMs,
+  struct quic_setting_value_uint64_t mtuDiscoverySearchCompleteTimeoutUs,
+  struct quic_setting_value_uint32_t tlsClientMaxSendBuffer,
+  struct quic_setting_value_uint32_t tlsServerMaxSendBuffer,
+  struct quic_setting_value_uint32_t streamRecvWindowDefault,
+  struct quic_setting_value_uint32_t streamRecvBufferDefault,
+  struct quic_setting_value_uint32_t connFlowControlWindow,
+  struct quic_setting_value_uint32_t maxWorkerQueueDelayUs,
+  struct quic_setting_value_uint32_t maxStatelessOperations,
+  struct quic_setting_value_uint32_t initialWindowPackets,
+  struct quic_setting_value_uint32_t sendIdleTimeoutMs,
+  struct quic_setting_value_uint32_t initialRttMs,
+  struct quic_setting_value_uint32_t maxAckDelayMs,
+  struct quic_setting_value_uint32_t disconnectTimeoutMs,
+  struct quic_setting_value_uint32_t keepAliveIntervalMs,
+  struct quic_setting_value_uint16_t congestionControlAlgorithm,
+  struct quic_setting_value_uint16_t peerBidiStreamCount,
+  struct quic_setting_value_uint16_t peerUnidiStreamCount,
+  struct quic_setting_value_uint16_t maxBindingStatelessOperations,
+  struct quic_setting_value_uint16_t statelessOperationExpirationMs,
+  struct quic_setting_value_uint16_t minimumMtu,
+  struct quic_setting_value_uint16_t maximumMtu,
+  struct quic_setting_value_uint8_t sendBufferingEnabled,
+  struct quic_setting_value_uint8_t pacingEnabled,
+  struct quic_setting_value_uint8_t migrationEnabled,
+  struct quic_setting_value_uint8_t datagramReceiveEnabled,
+  struct quic_setting_value_uint8_t serverResumptionLevel,
+  struct quic_setting_value_uint8_t greaseQuicBitEnabled,
+  struct quic_setting_value_uint8_t ecnEnabled,
+  struct quic_setting_value_uint8_t maxOperationsPerDrain,
+  struct quic_setting_value_uint8_t mtuDiscoveryMissingProbeCount,
+  struct quic_setting_value_uint32_t destCidUpdateIdleTimeoutMs) {
 
   int result = false;
   QUIC_SETTINGS* settings = calloc(1, sizeof(QUIC_SETTINGS));
-  if (maxBytesPerKey != NULL) {
-    settings->MaxBytesPerKey = *maxBytesPerKey;
-    settings->IsSet.MaxBytesPerKey = TRUE;
-  }
+  settings->MaxBytesPerKey = maxBytesPerKey.value;
+  settings->IsSet.MaxBytesPerKey = maxBytesPerKey.set;
 
-  if (handshakeIdleTimeoutMs != NULL) {
-    settings->HandshakeIdleTimeoutMs = *handshakeIdleTimeoutMs;
-    settings->IsSet.HandshakeIdleTimeoutMs = TRUE;
-  }
+  settings->HandshakeIdleTimeoutMs = handshakeIdleTimeoutMs.value;
+  settings->IsSet.HandshakeIdleTimeoutMs = handshakeIdleTimeoutMs.set;
 
-  if (idleTimeoutMs != NULL) {
-    settings->IdleTimeoutMs = *idleTimeoutMs;
-    settings->IsSet.IdleTimeoutMs = TRUE;
-  }
+  settings->IdleTimeoutMs = idleTimeoutMs.value;
+  settings->IsSet.IdleTimeoutMs = idleTimeoutMs.set;
 
-  if (mtuDiscoverySearchCompleteTimeoutUs != NULL) {
-    settings->MtuDiscoverySearchCompleteTimeoutUs = *mtuDiscoverySearchCompleteTimeoutUs;
-    settings->IsSet.IdleTimeoutMs = TRUE;
-  }
+  settings->MtuDiscoverySearchCompleteTimeoutUs = mtuDiscoverySearchCompleteTimeoutUs.value;
+  settings->IsSet.IdleTimeoutMs = idleTimeoutMs.set;
 
-  if (tlsClientMaxSendBuffer != NULL) {
-    settings->TlsClientMaxSendBuffer = *tlsClientMaxSendBuffer;
-    settings->IsSet.TlsClientMaxSendBuffer = TRUE;
-  }
+  settings->TlsClientMaxSendBuffer = tlsClientMaxSendBuffer.value;
+  settings->IsSet.TlsClientMaxSendBuffer = tlsClientMaxSendBuffer.set;
 
-  if (streamRecvWindowDefault != NULL) {
-    settings->StreamRecvWindowDefault = *streamRecvWindowDefault;
-    settings->IsSet.StreamRecvWindowDefault = TRUE;
-  }
+  settings->StreamRecvWindowDefault = streamRecvWindowDefault.value;
+  settings->IsSet.StreamRecvWindowDefault = streamRecvWindowDefault.set;
 
-  if (streamRecvBufferDefault != NULL) {
-    settings->StreamRecvBufferDefault = *streamRecvBufferDefault;
-    settings->IsSet.StreamRecvBufferDefault = TRUE;
-  }
+  settings->StreamRecvBufferDefault = streamRecvBufferDefault.value;
+  settings->IsSet.StreamRecvBufferDefault = streamRecvBufferDefault.set;
 
-  if (connFlowControlWindow != NULL) {
-    settings->ConnFlowControlWindow = *connFlowControlWindow;
-    settings->IsSet.ConnFlowControlWindow = TRUE;
-  }
+  settings->ConnFlowControlWindow = connFlowControlWindow.value;
+  settings->IsSet.ConnFlowControlWindow = connFlowControlWindow.set;
 
-  if (maxWorkerQueueDelayUs != NULL) {
-    settings->MaxWorkerQueueDelayUs = *maxWorkerQueueDelayUs;
-    settings->IsSet.MaxWorkerQueueDelayUs = TRUE;
-  }
+  settings->MaxWorkerQueueDelayUs = maxWorkerQueueDelayUs.value;
+  settings->IsSet.MaxWorkerQueueDelayUs = maxWorkerQueueDelayUs.set;
 
-  if (maxStatelessOperations != NULL) {
-    settings->MaxStatelessOperations = *maxStatelessOperations;
-    settings->IsSet.MaxStatelessOperations = TRUE;
-  }
+  settings->MaxStatelessOperations = maxStatelessOperations.value;
+  settings->IsSet.MaxStatelessOperations = maxStatelessOperations.set;
 
-  if (maxStatelessOperations != NULL) {
-    settings->MaxStatelessOperations = *maxWorkerQueueDelayUs;
-    settings->IsSet.MaxStatelessOperations = TRUE;
-  }
+  settings->MaxWorkerQueueDelayUs= maxWorkerQueueDelayUs.value;
+  settings->IsSet.MaxWorkerQueueDelayUs = maxWorkerQueueDelayUs.set;
 
-  if (initialWindowPackets != NULL) {
-    settings->InitialWindowPackets = *initialWindowPackets;
-    settings->IsSet.InitialWindowPackets = TRUE;
-  }
+  settings->InitialWindowPackets = initialWindowPackets.value;
+  settings->IsSet.InitialWindowPackets = initialWindowPackets.set;
 
-  if (sendIdleTimeoutMs != NULL) {
-    settings->SendIdleTimeoutMs = *sendIdleTimeoutMs;
-    settings->IsSet.SendIdleTimeoutMs = TRUE;
-  }
+  settings->SendIdleTimeoutMs = sendIdleTimeoutMs.value;
+  settings->IsSet.SendIdleTimeoutMs = sendIdleTimeoutMs.set;
 
-  if (initialRttMs != NULL) {
-    settings->InitialRttMs = *initialRttMs;
-    settings->IsSet.InitialRttMs = TRUE;
-  }
+  settings->InitialRttMs = initialRttMs.value;
+  settings->IsSet.InitialRttMs = initialRttMs.set;
 
-  if (maxAckDelayMs != NULL) {
-    settings->MaxAckDelayMs = *maxAckDelayMs;
-    settings->IsSet.MaxAckDelayMs = TRUE;
-  }
+  settings->MaxAckDelayMs = maxAckDelayMs.value;
+  settings->IsSet.MaxAckDelayMs = maxAckDelayMs.set;
 
-  if (disconnectTimeoutMs != NULL) {
-    settings->DisconnectTimeoutMs = *disconnectTimeoutMs;
-    settings->IsSet.DisconnectTimeoutMs = TRUE;
-  }
+  settings->DisconnectTimeoutMs = disconnectTimeoutMs.value;
+  settings->IsSet.DisconnectTimeoutMs = disconnectTimeoutMs.set;
 
-  if (keepAliveIntervalMs != NULL) {
-    settings->KeepAliveIntervalMs = *keepAliveIntervalMs;
-    settings->IsSet.KeepAliveIntervalMs = TRUE;
-  }
+  settings->KeepAliveIntervalMs = keepAliveIntervalMs.value;
+  settings->IsSet.KeepAliveIntervalMs = keepAliveIntervalMs.set;
 
-  if (congestionControlAlgorithm != NULL) {
-    settings->CongestionControlAlgorithm = *congestionControlAlgorithm;
-    settings->IsSet.CongestionControlAlgorithm = TRUE;
-  }
+  settings->CongestionControlAlgorithm = congestionControlAlgorithm.value;
+  settings->IsSet.CongestionControlAlgorithm = congestionControlAlgorithm.set;
 
-  if (peerBidiStreamCount != NULL) {
-    settings->PeerBidiStreamCount = *peerBidiStreamCount;
-    settings->IsSet.PeerBidiStreamCount = TRUE;
-  }
+  settings->PeerBidiStreamCount = peerBidiStreamCount.value;
+  settings->IsSet.PeerBidiStreamCount = peerBidiStreamCount.set;
 
-  if (peerUnidiStreamCount != NULL) {
-    settings->PeerUnidiStreamCount = *peerUnidiStreamCount;
-    settings->IsSet.PeerUnidiStreamCount = TRUE;
-  }
+  settings->PeerUnidiStreamCount = peerUnidiStreamCount.value;
+  settings->IsSet.PeerUnidiStreamCount = peerUnidiStreamCount.set;
 
-  if (maxBindingStatelessOperations != NULL) {
-    settings->MaxBindingStatelessOperations = *maxBindingStatelessOperations;
-    settings->IsSet.MaxBindingStatelessOperations = TRUE;
-  }
+  settings->MaxBindingStatelessOperations = maxBindingStatelessOperations.value;
+  settings->IsSet.MaxBindingStatelessOperations = maxBindingStatelessOperations.set;
 
-  if (statelessOperationExpirationMs != NULL) {
-    settings->StatelessOperationExpirationMs = *statelessOperationExpirationMs;
-    settings->IsSet.StatelessOperationExpirationMs = TRUE;
-  }
+  settings->StatelessOperationExpirationMs = statelessOperationExpirationMs.value;
+  settings->IsSet.StatelessOperationExpirationMs = statelessOperationExpirationMs.set;
 
-  if (minimumMtu != NULL) {
-    settings->MinimumMtu = *minimumMtu;
-    settings->IsSet.MinimumMtu = TRUE;
-  }
+  settings->MinimumMtu = minimumMtu.value;
+  settings->IsSet.MinimumMtu = minimumMtu.set;
 
-  if (maximumMtu != NULL) {
-    settings->MaximumMtu = *maximumMtu;
-    settings->IsSet.MaximumMtu = TRUE;
-  }
+  settings->MaximumMtu = maximumMtu.value;
+  settings->IsSet.MaximumMtu = maximumMtu.set;
 
-  if (sendBufferingEnabled != NULL) {
-    settings->SendBufferingEnabled = *sendBufferingEnabled;
-    settings->IsSet.SendBufferingEnabled = TRUE;
-  }
+  settings->SendBufferingEnabled = sendBufferingEnabled.value;
+  settings->IsSet.SendBufferingEnabled = sendBufferingEnabled.set;
 
-  if (pacingEnabled != NULL) {
-    settings->PacingEnabled = *pacingEnabled;
-    settings->IsSet.PacingEnabled = TRUE;
-  }
+  settings->PacingEnabled = pacingEnabled.value;
+  settings->IsSet.PacingEnabled = pacingEnabled.set;
 
-  if (migrationEnabled != NULL) {
-    settings->MigrationEnabled = *migrationEnabled;
-    settings->IsSet.MigrationEnabled = TRUE;
-  }
+  settings->MaxOperationsPerDrain = migrationEnabled.value;
+  settings->IsSet.MaxOperationsPerDrain = migrationEnabled.set;
 
-  if (datagramReceiveEnabled != NULL) {
-    settings->DatagramReceiveEnabled = *datagramReceiveEnabled;
-    settings->IsSet.DatagramReceiveEnabled = TRUE;
-  }
+  settings->DatagramReceiveEnabled = datagramReceiveEnabled.value;
+  settings->IsSet.DatagramReceiveEnabled = datagramReceiveEnabled.set;
 
-  if (serverResumptionLevel != NULL) {
-    settings->ServerResumptionLevel = *serverResumptionLevel;
-    settings->IsSet.ServerResumptionLevel = TRUE;
-  }
+  settings->ServerResumptionLevel = serverResumptionLevel.value;
+  settings->IsSet.ServerResumptionLevel = serverResumptionLevel.set;
 
-  if (pacingEnabled != NULL) {
-    settings->PacingEnabled = *pacingEnabled;
-    settings->IsSet.PacingEnabled = TRUE;
-  }
+  settings->GreaseQuicBitEnabled = greaseQuicBitEnabled.value;
+  settings->IsSet.GreaseQuicBitEnabled = greaseQuicBitEnabled.set;
 
-  if (migrationEnabled != NULL) {
-    settings->MigrationEnabled = *migrationEnabled;
-    settings->IsSet.MigrationEnabled = TRUE;
-  }
+  settings->EcnEnabled = ecnEnabled.value;
+  settings->IsSet.EcnEnabled = ecnEnabled.set;
 
-  if (datagramReceiveEnabled != NULL) {
-    settings->DatagramReceiveEnabled = *datagramReceiveEnabled;
-    settings->IsSet.DatagramReceiveEnabled = TRUE;
-  }
+  settings->MaxOperationsPerDrain = maxOperationsPerDrain.value;
+  settings->IsSet.MaxOperationsPerDrain = maxOperationsPerDrain.set;
 
-  if (serverResumptionLevel != NULL) {
-    settings->ServerResumptionLevel = *serverResumptionLevel;
-    settings->IsSet.ServerResumptionLevel = TRUE;
-  }
+  settings->MtuDiscoveryMissingProbeCount = mtuDiscoveryMissingProbeCount.value;
+  settings->IsSet.MtuDiscoveryMissingProbeCount = mtuDiscoveryMissingProbeCount.set;
 
-  if (greaseQuicBitEnabled != NULL) {
-    settings->GreaseQuicBitEnabled = *greaseQuicBitEnabled;
-    settings->IsSet.GreaseQuicBitEnabled = TRUE;
-  }
+  settings->DestCidUpdateIdleTimeoutMs = destCidUpdateIdleTimeoutMs.value;
+  settings->IsSet.DestCidUpdateIdleTimeoutMs = destCidUpdateIdleTimeoutMs.set;
 
-  if (ecnEnabled != NULL) {
-    settings->EcnEnabled = *ecnEnabled;
-    settings->IsSet.EcnEnabled= TRUE;
-  }
-
-  if (maxOperationsPerDrain != NULL) {
-    settings->MaxOperationsPerDrain = *maxOperationsPerDrain;
-    settings->IsSet.MaxOperationsPerDrain = TRUE;
-  }
-
-  if (mtuDiscoveryMissingProbeCount != NULL) {
-    settings->MtuDiscoveryMissingProbeCount = *mtuDiscoveryMissingProbeCount;
-    settings->IsSet.MtuDiscoveryMissingProbeCount = TRUE;
-  }
-
-  if (destCidUpdateIdleTimeoutMs != NULL) {
-    settings->DestCidUpdateIdleTimeoutMs = *destCidUpdateIdleTimeoutMs;
-    settings->IsSet.DestCidUpdateIdleTimeoutMs = TRUE;
-  }
   return settings;
 }
 HQUIC* quic_new_configuration(HQUIC* registration, QUIC_BUFFER* alpn, uint32_t alpnSize, QUIC_SETTINGS* settings) {

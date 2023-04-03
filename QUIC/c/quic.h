@@ -18,40 +18,61 @@ QUIC_CERTIFICATE_PKCS12* quic_certificate_pkcs12(const uint8_t *Asn1Blob, uint32
 void quic_free_certificate_file(QUIC_CERTIFICATE_FILE* cert);
 void quic_free(void* ptr);
 QUIC_CREDENTIAL_CONFIG* quic_new_credential_config(int32_t credType, uint64_t flags, void * cert, uint8_t allowedCiphers, const char* caCertificateFile);
-QUIC_SETTINGS* quic_new_settings(uint64_t* maxBytesPerKey,
-    uint64_t* handshakeIdleTimeoutMs,
-    uint64_t* idleTimeoutMs,
-    uint64_t* mtuDiscoverySearchCompleteTimeoutUs,
-    uint32_t* tlsClientMaxSendBuffer,
-    uint32_t* tlsServerMaxSendBuffer,
-    uint32_t* streamRecvWindowDefault,
-    uint32_t* streamRecvBufferDefault,
-    uint32_t* connFlowControlWindow,
-    uint32_t* maxWorkerQueueDelayUs,
-    uint32_t* maxStatelessOperations,
-    uint32_t* initialWindowPackets,
-    uint32_t* sendIdleTimeoutMs,
-    uint32_t* initialRttMs,
-    uint32_t* maxAckDelayMs,
-    uint32_t* disconnectTimeoutMs,
-    uint32_t* keepAliveIntervalMs,
-    uint16_t* congestionControlAlgorithm,
-    uint16_t* peerBidiStreamCount,
-    uint16_t* peerUnidiStreamCount,
-    uint16_t* maxBindingStatelessOperations,
-    uint16_t* dtatelessOperationExpirationMs,
-    uint16_t* minimumMtu,
-    uint16_t* maximumMtu,
-    uint8_t* sendBufferingEnabled,
-    uint8_t* pacingEnabled,
-    uint8_t* migrationEnabled,
-    uint8_t* datagramReceiveEnabled,
-    uint8_t* serverResumptionLevel,
-    uint8_t* greaseQuicBitEnabled,
-    uint8_t* ecnEnabled,
-    uint8_t* maxOperationsPerDrain,
-    uint8_t* mtuDiscoveryMissingProbeCount,
-    uint32_t* destCidUpdateIdleTimeoutMs);
+
+struct quic_setting_value_uint64_t {
+  uint64_t set;
+  uint64_t value;
+};
+
+struct quic_setting_value_uint32_t {
+  uint64_t set;
+  uint32_t value;
+};
+
+struct quic_setting_value_uint16_t {
+  uint64_t set;
+  uint16_t value;
+};
+
+struct quic_setting_value_uint8_t {
+  uint64_t set;
+  uint8_t value;
+};
+
+QUIC_SETTINGS* quic_new_settings(struct quic_setting_value_uint64_t maxBytesPerKey,
+    struct quic_setting_value_uint64_t handshakeIdleTimeoutMs,
+    struct quic_setting_value_uint64_t idleTimeoutMs,
+    struct quic_setting_value_uint64_t mtuDiscoverySearchCompleteTimeoutUs,
+    struct quic_setting_value_uint32_t tlsClientMaxSendBuffer,
+    struct quic_setting_value_uint32_t tlsServerMaxSendBuffer,
+    struct quic_setting_value_uint32_t streamRecvWindowDefault,
+    struct quic_setting_value_uint32_t streamRecvBufferDefault,
+    struct quic_setting_value_uint32_t connFlowControlWindow,
+    struct quic_setting_value_uint32_t maxWorkerQueueDelayUs,
+    struct quic_setting_value_uint32_t maxStatelessOperations,
+    struct quic_setting_value_uint32_t initialWindowPackets,
+    struct quic_setting_value_uint32_t sendIdleTimeoutMs,
+    struct quic_setting_value_uint32_t initialRttMs,
+    struct quic_setting_value_uint32_t maxAckDelayMs,
+    struct quic_setting_value_uint32_t disconnectTimeoutMs,
+    struct quic_setting_value_uint32_t keepAliveIntervalMs,
+    struct quic_setting_value_uint16_t congestionControlAlgorithm,
+    struct quic_setting_value_uint16_t peerBidiStreamCount,
+    struct quic_setting_value_uint16_t peerUnidiStreamCount,
+    struct quic_setting_value_uint16_t maxBindingStatelessOperations,
+    struct quic_setting_value_uint16_t dtatelessOperationExpirationMs,
+    struct quic_setting_value_uint16_t minimumMtu,
+    struct quic_setting_value_uint16_t maximumMtu,
+    struct quic_setting_value_uint8_t sendBufferingEnabled,
+    struct quic_setting_value_uint8_t pacingEnabled,
+    struct quic_setting_value_uint8_t migrationEnabled,
+    struct quic_setting_value_uint8_t datagramReceiveEnabled,
+    struct quic_setting_value_uint8_t serverResumptionLevel,
+    struct quic_setting_value_uint8_t greaseQuicBitEnabled,
+    struct quic_setting_value_uint8_t ecnEnabled,
+    struct quic_setting_value_uint8_t maxOperationsPerDrain,
+    struct quic_setting_value_uint8_t mtuDiscoveryMissingProbeCount,
+    struct quic_setting_value_uint32_t destCidUpdateIdleTimeoutMs);
 HQUIC* quic_new_configuration(HQUIC* registration, QUIC_BUFFER* alpn, uint32_t alpnSize, QUIC_SETTINGS* settings);
 void quic_configuration_load_credential(HQUIC* configuration, QUIC_CREDENTIAL_CONFIG* credentials);
 uint8_t quic_is_new_connection_event(QUIC_LISTENER_EVENT* event);

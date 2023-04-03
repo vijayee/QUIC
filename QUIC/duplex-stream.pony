@@ -1,14 +1,7 @@
 use "Streams"
 use "Exception"
 use "collections"
-use @quic_get_stream_event_type_as_uint[U32](event: Pointer[None] tag)
-use @quic_stream_get_total_buffer_length[U64](event: Pointer[None] tag)
-use @quic_stream_status_pending[U32]()
-use @pony_alloc[Pointer[U8]](ctx: Pointer[None], size: USize)
-use @pony_ctx[Pointer[None]]()
-use @quic_stream_get_total_buffer[None](event: Pointer[None] tag, buffer: Pointer[U8] tag, stream: Pointer[None] tag)
-use @quic_stream_actor[QUICStream](ctx: Pointer[None] tag)
-use @quic_free[None](ptr: Pointer[None] tag)
+
 type QUICStream is (QUICDuplexStream | QUICReadableStream | QUICWriteableStream)
 
 
@@ -36,7 +29,7 @@ primitive _QUICStreamCallback
     //QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN
       match stream
         | let stream': QUICDuplexStream =>
-          stream.closeWrite()
+          stream'.closeWrite()
           return @quic_stream_status_pending()
         | let stream': QUICReadableStream =>
           stream'._receive(event)
@@ -65,7 +58,7 @@ primitive _QUICStreamCallback
     | 9 =>
       None
   end
-  return 0
+  0
 
 actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
   var _readable: Bool = true
@@ -78,9 +71,11 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
   let _buffer: RingBuffer[U8]
   let _ctx: Pointer[None] tag
 
-  new create(stream: Pointer[None] tag, ctx: Pointer[None] tag) =>
+  new _create(stream: Pointer[None] tag, ctx: Pointer[None] tag) =>
     _subscribers' = Subscribers(3)
-    _buffer = RingBuffer(128000)
+    _buffer = RingBuffer[U8](128000)
+    _stream = stream
+    _ctx = ctx
 
   fun ref subscribers(): Subscribers=>
     _subscribers'
@@ -96,10 +91,10 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
 
   be _receive(event: Pointer[None] tag) =>
     let data: Array[U8] iso = recover
-      let size: U64 = @quic_stream_get_total_buffer_length(event)
-      let buffer: Pointer[U8] = @pony_alloc(@pony_ctx(), size.usize())
-      @quic_stream_get_total_buffer(event, buffer, stream)
-      let data' = Array.cpointer(buffer, size)
+      let size: USize = @quic_stream_get_total_buffer_length(event).usize()
+      let buffer: Pointer[U8] = @pony_alloc(@pony_ctx(), size)
+      @quic_stream_get_total_buffer(event, buffer, _stream)
+      let data': Array[U8] = Array[U8].from_cpointer(buffer, size)
       data'
     end
     notifyData(consume data)
@@ -138,21 +133,22 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
       size' = size'.min(_buffer.size())
 
       let data = recover Array[U8](size') end
-      let stop = _buffer.head() + size'
+
       try
-        for i in Range(_buffer.head(), stop) do
+        let stop = _buffer.head()? + size'
+        for i in Range(_buffer.head()?, stop) do
           data.push(_buffer(i)?)
         end
         cb(consume data)
         try
           if stop < _buffer.size() then
             let buf = Array[U8](_buffer.size() - stop)
-            for i in Range(stop, _buffer.size()) do
-              buf.push(_buffer(i)?)
+            for i' in Range(stop, _buffer.size()) do
+              buf.push(_buffer(i')?)
             end
             _buffer.clear()
-            for i in buf.values() do
-              _buffer.push(i)
+            for i'' in buf.values() do
+              _buffer.push(i'')
             end
           end
         else
@@ -270,54 +266,3 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
 
   be closeWrite() =>
     _close()
-
-  fun ref notifyData(data: Array[U8] iso) =>
-    try
-      let subscribers': Subscribers  = subscribers()
-      var notify'': (DataNotify[Array[U8] iso] | None) =  None
-      let onces = Array[USize](subscribers'.size())
-
-      var i: USize = 0
-      for notify in subscribers'(DataKey[Array[U8] iso])?.values() do
-        match notify
-        |  (let notify': DataNotify[Array[U8] iso], let once: Bool) =>
-            notify'' = notify'
-            if once then
-              onces.push(i)
-            end
-            break
-        end
-        i = i + 1
-      end
-
-      match notify''
-        | let notify''': DataNotify[Array[U8] iso] =>
-          if _buffer.size() > 0 then
-            try
-              data' = recover Array[U8](_buffer.size() + data.size()) end
-              for i' in Range(_buffer.head(), _buffer.head() + _buffer.size()) do
-                data'.push(_buffer(i')?)
-              end
-              for i'' in data.values() do
-                data'.push(i'')
-              end
-              notify'''(consume data')
-              _buffer.clear()
-            else
-              notifyError(Exception("Error copying buffer"))
-            end
-          else
-            notify'''(consume data)
-          end
-        else
-          let overflow = for i' in data.values() do
-            _buffer.push(i')
-          end
-          if overflow then
-            _notifyOverflow()
-          end
-      end
-      if onces.size() > 0 then
-        discardOnces(subscribers'(DataKey[Array[U8] iso])?, onces)
-      end
-    end

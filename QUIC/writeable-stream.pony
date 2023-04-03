@@ -1,13 +1,14 @@
 use "Streams"
 use "Exception"
-use @quic_free[None](ptr: Pointer[None] tag)
+
 actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
   var _isDestroyed: Bool = false
   let _subscribers': Subscribers
   let _ctx: Pointer[None] tag
 
-  new create() =>
+  new create(ctx: Pointer[None] tag) =>
     _subscribers' = Subscribers(3)
+    _ctx = ctx
 
   fun ref subscribers(): Subscribers=>
     _subscribers'
@@ -63,7 +64,6 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
         notifyError(message')
     end
     _isDestroyed = true
-    _file.dispose()
     let subscribers': Subscribers = subscribers()
     subscribers'.clear()
 
@@ -71,7 +71,6 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
     if not destroyed() then
       notifyFinished()
       _isDestroyed = true
-      _file.dispose()
       notifyClose()
       let subscribers': Subscribers = subscribers()
       subscribers'.clear()

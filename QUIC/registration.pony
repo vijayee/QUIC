@@ -2,10 +2,6 @@ use "lib:numa"
 use "lib:msquic"
 use "lib:ponyquic"
 use "net"
-use @quic_new_registration[Pointer[None] tag](config: Pointer[None] tag)?
-use @quic_free_registration[None](registration: Pointer[None] tag)
-use @quic_new_registration_config[Pointer[None] tag](appName: Pointer[U8 val] tag, executionProfile: I32)
-use @quic_free[None](ptr: Pointer[None] tag)
 
 primitive LowLatency
 primitive MaxThroughput
