@@ -3,7 +3,7 @@ use "Exception"
 
 primitive QUICHashspace
   fun apply(): USize => 20000
-
+//Connection Events
 trait ConnectedNotify is PayloadNotify[ConnectedData val]
   fun ref apply(data: ConnectedData val)
   fun box hash(): USize =>
@@ -196,14 +196,15 @@ primitive PeerCertificateReceivedEvent is PeerCertificateReceivedNotify
     @quic_connection_set_datagram_peer_certificate_received_event(ctx, 1)
   fun _disable(ctx: Pointer[None] tag) =>
     @quic_connection_set_datagram_peer_certificate_received_event(ctx, 0)
-/*
-trait StartCompleteNotify is PayloadNotify[StartCompleteData]
-  fun ref apply(data: StartCompleteData) => None
+
+//Stream Events
+trait StreamStartCompleteNotify is PayloadNotify[StreamStartCompleteData]
+  fun ref apply(data: StreamStartCompleteData) => None
   fun box hash(): USize =>
     QUICHashspace() + 17
 
-primitive StartCompleteEvent is StartCompleteNotify
-  fun ref apply(data: Array[U8] val) => None
+primitive StreamStartCompleteEvent is StreamStartCompleteNotify
+  fun ref apply(data: StreamStartCompleteData) => None
 
 trait SendCompleteNotify is PayloadNotify[SendCompleteData]
   fun ref apply(data: SendCompleteData) => None
@@ -211,37 +212,53 @@ trait SendCompleteNotify is PayloadNotify[SendCompleteData]
     QUICHashspace() + 18
 
 primitive SendCompleteEvent is SendCompleteNotify
-  fun ref apply(data: Array[U8] val) => None
+  fun ref apply(data: SendCompleteData) => None
 
-trait PeerSendAbortedNotify is PayloadNotify[Exception]
-  fun ref apply(data: Exception) => None
+trait PeerSendAbortedNotify is PayloadNotify[PeerSendAbortedData]
+  fun ref apply(data: PeerSendAbortedData) => None
   fun box hash(): USize =>
     QUICHashspace() + 19
 
 primitive PeerSendAbortedEvent is PeerSendAbortedNotify
-  fun ref apply(data: Array[U8] val) => None
+  fun ref apply(data: PeerSendAbortedData) => None
 
-trait SendShutdownCompleteNotify is PayloadNotify[Bool]
-  fun ref apply(data: Bool) => None
+trait PeerReceiveAbortedNotify is PayloadNotify[PeerReceiveAbortedData]
+  fun ref apply(data: PeerReceiveAbortedData) => None
   fun box hash(): USize =>
     QUICHashspace() + 20
 
-primitive SendShutdownCompleteEvent is SendShutdownCompleteNotify
-  fun ref apply(data: Array[U8] val) => None
+primitive PeerReceiveAbortedEvent is PeerReceiveAbortedNotify
+  fun ref apply(data: PeerReceiveAbortedData) => None
 
-trait StreamShutdownCompleteNotify is PayloadNotify[Bool]
-  fun ref apply(data: Bool) => None
+
+trait SendShutdownCompleteNotify is PayloadNotify[SendShutdownCompleteData]
+  fun ref apply(data: SendShutdownCompleteData) => None
   fun box hash(): USize =>
     QUICHashspace() + 21
 
-primitive StreamShutdownCompleteEvent is SendShutdownCompleteNotify
-  fun ref apply(data: Bool) => None
+primitive SendShutdownCompleteEvent is SendShutdownCompleteNotify
+  fun ref apply(data: SendShutdownCompleteData) => None
 
-trait IdealSendBufferSizeNotify is PayloadNotify[U64]
-  fun ref apply(data: U64) => None
+trait StreamShutdownCompleteNotify is PayloadNotify[StreamShutdownCompleteData]
+  fun ref apply(data: StreamShutdownCompleteData) => None
   fun box hash(): USize =>
     QUICHashspace() + 22
 
+primitive StreamShutdownCompleteEvent is StreamShutdownCompleteNotify
+  fun ref apply(data: StreamShutdownCompleteData) => None
+
+trait IdealSendBufferSizeNotify is PayloadNotify[IdealSendBufferSizeData]
+  fun ref apply(data: IdealSendBufferSizeData) => None
+  fun box hash(): USize =>
+    QUICHashspace() + 23
+
 primitive IdealSendBufferSizeEvent is IdealSendBufferSizeNotify
-  fun ref apply(data: U64) => None
-*/
+  fun ref apply(data: IdealSendBufferSizeData) => None
+
+trait PeerAcceptedNotify is VoidNotify
+  fun ref apply() => None
+  fun box hash(): USize =>
+    QUICHashspace() + 24
+
+primitive PeerAcceptedEvent is PeerAcceptedNotify
+  fun ref apply() => None

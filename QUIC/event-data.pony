@@ -103,3 +103,65 @@ struct QUICBuffer
   new create(length': U32, buffer': Pointer[U8] tag) =>
     length = length'
     buffer = buffer'
+
+struct _StreamStartCompleteData
+  var status: U32 = 0
+  var id: U64 = 0
+  var peerAccepted: U8 = 0
+
+class val StreamStartCompleteData
+  var status: U32
+  var id: U64
+  var peerAccepted: Bool
+  new create(status': U32, id': U64, peerAccepted': Bool) =>
+    status = status'
+    id = id'
+    peerAccepted = peerAccepted'
+
+struct _StreamShutdownCompleteData
+  var connectionShutdown: U8 = 0
+  var appCloseInProgress: U8 = 0
+  var connectionShutdownByApp: U8 = 0
+  var connectionClosedRemotely: U8 = 0
+  var connectionErrorCode: U64 = 0
+  var connectionCloseStatus: U32 = 0
+
+class val StreamShutdownCompleteData
+  let connectionShutdown: Bool
+  let appCloseInProgress: Bool
+  let connectionShutdownByApp: Bool
+  let connectionClosedRemotely: Bool
+  let connectionErrorCode: U64
+  let connectionCloseStatus: U32
+  new create(connectionShutdown': Bool, appCloseInProgress': Bool, connectionShutdownByApp': Bool, connectionClosedRemotely': Bool, connectionErrorCode': U64, connectionCloseStatus': U32) =>
+    connectionShutdown = connectionShutdown'
+    appCloseInProgress = appCloseInProgress'
+    connectionShutdownByApp = connectionShutdownByApp'
+    connectionClosedRemotely = connectionClosedRemotely'
+    connectionErrorCode = connectionErrorCode'
+    connectionCloseStatus = connectionCloseStatus'
+
+class val SendCompleteData
+  let canceled: Bool
+  new create(canceled': Bool) =>
+    canceled = canceled'
+
+class val SendShutdownCompleteData
+  let graceful: Bool
+  new create(graceful': Bool) =>
+    graceful = graceful'
+
+class val PeerSendAbortedData
+  let errorCode: U64
+  new create(errorCode': U64) =>
+     errorCode =  errorCode'
+
+class val PeerReceiveAbortedData
+ let errorCode: U64
+ new create(errorCode': U64) =>
+    errorCode =  errorCode'
+
+class val IdealSendBufferSizeData
+  let byteCount: U64
+  new create(byteCount': U64) =>
+    byteCount = byteCount'

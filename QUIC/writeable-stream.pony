@@ -5,8 +5,10 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
   var _isDestroyed: Bool = false
   let _subscribers': Subscribers
   let _ctx: Pointer[None] tag
+  let _stream: Pointer[None] tag
 
-  new create(ctx: Pointer[None] tag) =>
+  new _create(stream: Pointer[None] tag, ctx: Pointer[None] tag) =>
+    _stream = stream
     _subscribers' = Subscribers(3)
     _ctx = ctx
 
@@ -18,6 +20,30 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
 
   fun _final() =>
     @quic_free(_ctx)
+
+  be _dispatchStreamStartComplete(data: StreamStartCompleteData) =>
+    notifyPayload[StreamStartCompleteData](StreamStartCompleteEvent, data)
+
+  be _dispatchSendComplete(data: SendCompleteData) =>
+    notifyPayload[SendCompleteData](SendCompleteEvent, data)
+
+  be _dispatchPeerReceiveAborted(data: PeerReceiveAbortedData) =>
+    notifyPayload[PeerReceiveAbortedData](PeerReceiveAbortedEvent, data)
+    
+  be _dispatchPeerSendAborted(data: PeerSendAbortedData) =>
+    notifyPayload[PeerSendAbortedData](PeerSendAbortedEvent, data)
+
+  be _dispatchSendShutdownComplete(data: SendShutdownCompleteData) =>
+    notifyPayload[SendShutdownCompleteData](SendShutdownCompleteEvent, data)
+
+  be _dispatchStreamShutdownComplete(data: StreamShutdownCompleteData) =>
+    notifyPayload[StreamShutdownCompleteData](StreamShutdownCompleteEvent, data)
+
+  be _dispatchIdealSendBufferSize(data: IdealSendBufferSizeData) =>
+    notifyPayload[IdealSendBufferSizeData](IdealSendBufferSizeEvent, data)
+
+  be _dispatchPeerAccepted() =>
+    notify(PeerAcceptedEvent)
 
   be write(data: Array[U8] iso) =>
     if destroyed() then
@@ -69,6 +95,7 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
 
   be close() =>
     if not destroyed() then
+      @quic_stream_close_stream(_stream)
       notifyFinished()
       _isDestroyed = true
       notifyClose()

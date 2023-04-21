@@ -50,6 +50,30 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
     end
     notifyData(consume data)
 
+  be _dispatchStreamStartComplete(data: StreamStartCompleteData) =>
+    notifyPayload[StreamStartCompleteData](StreamStartCompleteEvent, data)
+
+  be _dispatchSendComplete(data: SendCompleteData) =>
+    notifyPayload[SendCompleteData](SendCompleteEvent, data)
+
+  be _dispatchPeerReceiveAborted(data: PeerReceiveAbortedData) =>
+    notifyPayload[PeerReceiveAbortedData](PeerReceiveAbortedEvent, data)
+
+  be _dispatchPeerSendAborted(data: PeerSendAbortedData) =>
+    notifyPayload[PeerSendAbortedData](PeerSendAbortedEvent, data)
+
+  be _dispatchSendShutdownComplete(data: SendShutdownCompleteData) =>
+    notifyPayload[SendShutdownCompleteData](SendShutdownCompleteEvent, data)
+
+  be _dispatchStreamShutdownComplete(data: StreamShutdownCompleteData) =>
+    notifyPayload[StreamShutdownCompleteData](StreamShutdownCompleteEvent, data)
+
+  be _dispatchIdealSendBufferSize(data: IdealSendBufferSizeData) =>
+    notifyPayload[IdealSendBufferSizeData](IdealSendBufferSizeEvent, data)
+
+  be _dispatchPeerAccepted() =>
+    notify(PeerAcceptedEvent)
+
   be push() =>
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
@@ -149,6 +173,7 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
 
   be close() =>
     if not destroyed() then
+       @quic_stream_close_stream(_stream)
       _isDestroyed = true
       notifyClose()
       let subscribers': Subscribers = subscribers()

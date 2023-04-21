@@ -115,3 +115,14 @@ use @quic_connection_set_callback[None](connection: Pointer[None] tag, connectio
 use @quic_new_server_event_context[Pointer[None] tag](serverActor: QUICServer, configuration: Pointer[None] tag)
 use @quic_new_connection_event_context[Pointer[None] tag]()
 use @quic_connection_event_context_set_actor[None](ctx: Pointer[None] tag, connectionActor: QUICConnection)
+
+use @quic_stream_start_complete_data[_StreamStartCompleteData](event: Pointer[None] tag)
+use @quic_stream_event_send_complete_canceled[U8](event: Pointer[None] tag)
+use @quic_stream_event_peer_send_aborted_error_code[U64](event: Pointer[None] tag)
+use @quic_stream_event_peer_receive_aborted_error_code[U64](event: Pointer[None] tag)
+use @quic_stream_event_send_shutdown_complete_graceful[U8](event: Pointer[None] tag)
+use @quic_stream_shutdown_complete_data[_StreamShutdownCompleteData](event: Pointer[None] tag)
+use @quic_stream_event_ideal_send_buffer_size_byte_count[U64](event: Pointer[None] tag)
+use @quic_stream_open_stream[Pointer[None] tag](connection: Pointer[None] tag, flag: U32, callback: Pointer[None] tag, ctx: Pointer[None] tag)?
+use @quic_stream_close_stream[None](stream: Pointer[None] tag)
+use @quic_stream_start_stream[None](stream: Pointer[None] tag)?

@@ -1,4 +1,5 @@
 use "Streams"
+use "Exception"
 
 primitive _QUICConnectionCallback
   fun apply (conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
@@ -175,6 +176,33 @@ primitive _QUICConnectionCallback
     end
     0
 
+primitive OpenZeroRTTStream
+  fun apply(): U32 =>
+    0x0001
+
+primitive OpenUnidirectionalStream
+  fun apply(): U32 =>
+    0x0002
+
+type QUICStreamOpenFlags is (OpenZeroRTTStream | OpenUnidirectionalStream)
+
+primitive Immediate
+  fun apply(): U32 =>
+    0x0001
+
+primitive FailBlocked
+  fun apply(): U32 =>
+    0x0002
+
+primitive ShutdownOnFail
+  fun apply(): U32 =>
+    0x0004
+
+primitive IndicatePeerAccept
+  fun apply(): U32 =>
+    0x0008
+
+type QUICStreamStartFlags is (None | Immediate | FailBlocked | ShutdownOnFail | IndicatePeerAccept)
 
 actor QUICConnection is NotificationEmitter
   let _connection: Pointer[None] tag
@@ -200,6 +228,31 @@ actor QUICConnection is NotificationEmitter
 
   fun ref subscribers() : Subscribers =>
     _subscribers
+//, cb: {(stream: (S | Exception) )} val
+  be openStream[S: (QUICDuplexStream tag | QUICWriteableStream tag) = QUICDuplexStream](cb: {((S | Exception))} val, flag: (QUICStreamOpenFlags | None) = None) =>
+    let ctx: Pointer[None] tag = @quic_stream_new_event_context()
+    let streamCallback = @{(strm: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag) =>
+      _QUICStreamCallback(strm, context, event)
+    }
+    try
+      let flag': U32 = match flag
+      | None => 0
+      | let flag'': QUICStreamOpenFlags => flag''()
+      end
+      let strm: Pointer[None] tag = @quic_stream_open_stream(_connection, flag', streamCallback, ctx)?
+      @quic_stream_start_stream(strm)?
+      iftype S <: QUICWriteableStream then
+        let ws: QUICWriteableStream tag = QUICWriteableStream._create(strm, ctx)
+        cb(ws)
+      elseif S <: QUICDuplexStream then
+        let ds: QUICDuplexStream tag = QUICDuplexStream._create(strm, ctx)
+        cb(ds)
+      end
+    else
+      cb(Exception("Failed to Open Stream"))
+      @quic_free(ctx)
+    end
+
   be _receiveNewStream(stream: QUICStream) =>
     _streams.push(stream)
     _dispatchPeerStreamStarted(stream)

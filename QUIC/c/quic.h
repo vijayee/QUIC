@@ -288,3 +288,30 @@ struct quic_stream_event_context {
 struct quic_stream_event_context * quic_stream_new_event_context();
 void quic_stream_event_context_set_actor(struct quic_stream_event_context* ctx, void* streamActor);
 void * quic_stream_actor(struct quic_stream_event_context* ctx);
+
+struct stream_start_complete_data {
+  uint32_t status;
+  uint64_t id;
+  uint8_t peerAccepted;
+};
+
+struct stream_start_complete_data quic_stream_start_complete_data(QUIC_STREAM_EVENT * event);
+uint8_t quic_stream_event_send_complete_canceled(QUIC_STREAM_EVENT * event);
+uint64_t quic_stream_event_peer_send_aborted_error_code(QUIC_STREAM_EVENT * event);
+uint64_t quic_stream_event_peer_receive_aborted_error_code(QUIC_STREAM_EVENT * event);
+uint8_t quic_stream_event_send_shutdown_complete_graceful(QUIC_STREAM_EVENT * event);
+
+struct stream_shutdown_complete_data {
+  uint8_t connectionShutdown;
+  uint8_t appCloseInProgress;
+  uint8_t connectionShutdownByApp;
+  uint8_t connectionClosedRemotely;
+  uint64_t connectionErrorCode;
+  uint32_t connectionCloseStatus;
+};
+
+struct stream_shutdown_complete_data quic_stream_shutdown_complete_data(QUIC_STREAM_EVENT * event);
+uint64_t quic_stream_event_ideal_send_buffer_size_byte_count(QUIC_STREAM_EVENT * event);
+HQUIC* quic_stream_open_stream(HQUIC* connection, QUIC_STREAM_OPEN_FLAGS flag, void* callback, void* ctx);
+void quic_stream_close_stream(HQUIC* stream);
+void quic_stream_start_stream(HQUIC* stream, QUIC_STREAM_START_FLAGS flag);

@@ -681,10 +681,9 @@ uint64_t quic_connection_shutdown_initiated_by_peer_data(QUIC_CONNECTION_EVENT* 
 }
 
 void quic_connection_shutdown_complete_data(QUIC_CONNECTION_EVENT* event, struct shutdown_complete_data* data) {
-  uint8_t* eventData = (uint8_t*) &event->SHUTDOWN_COMPLETE;
-  data->handshakeCompleted = (*eventData >> 0) & 0x01;
-  data->peerAcknowledgedShutdown = (*eventData >> 1) & 0x01;
-  data->appCloseInProgress = (*eventData >> 2) & 0x01;
+  data->handshakeCompleted = (uint8_t) event->SHUTDOWN_COMPLETE.HandshakeCompleted;
+  data->peerAcknowledgedShutdown = (uint8_t) event->SHUTDOWN_COMPLETE.PeerAcknowledgedShutdown;
+  data->appCloseInProgress = (uint8_t) event->SHUTDOWN_COMPLETE.AppCloseInProgress;
 }
 
 QUIC_ADDR* quic_connection_event_local_address_changed_data(QUIC_CONNECTION_EVENT* event) {
@@ -694,7 +693,7 @@ QUIC_ADDR* quic_connection_event_local_address_changed_data(QUIC_CONNECTION_EVEN
 }
 
 QUIC_ADDR* quic_connection_event_peer_address_changed_data(QUIC_CONNECTION_EVENT* event) {
-  QUIC_ADDR* addr= malloc(sizeof(event->PEER_ADDRESS_CHANGED.Address));
+  QUIC_ADDR* addr = malloc(sizeof(event->PEER_ADDRESS_CHANGED.Address));
   memcpy(addr, &event->PEER_ADDRESS_CHANGED.Address, sizeof(event->PEER_ADDRESS_CHANGED.Address));
   return addr;
 }
@@ -757,4 +756,62 @@ void quic_stream_event_context_set_actor(struct quic_stream_event_context* ctx, 
 
 void* quic_stream_actor(struct quic_stream_event_context* ctx) {
   return ctx->streamActor;
+}
+
+struct stream_start_complete_data quic_stream_start_complete_data(QUIC_STREAM_EVENT * event) {
+  struct stream_start_complete_data data;
+  data.status = (uint32_t) event->START_COMPLETE.Status;
+  data.id = event->START_COMPLETE.ID;
+  data.peerAccepted = (uint8_t) event->START_COMPLETE.PeerAccepted;
+  return data;
+}
+
+uint8_t quic_stream_event_send_complete_canceled(QUIC_STREAM_EVENT * event) {
+  return (uint8_t) event->SEND_COMPLETE.Canceled;
+}
+
+uint64_t quic_stream_event_peer_send_aborted_error_code(QUIC_STREAM_EVENT * event) {
+  return event->PEER_SEND_ABORTED.ErrorCode;
+}
+
+uint64_t quic_stream_event_peer_receive_aborted_error_code(QUIC_STREAM_EVENT * event) {
+  return event->PEER_RECEIVE_ABORTED.ErrorCode;
+}
+
+uint8_t quic_stream_event_send_shutdown_complete_graceful(QUIC_STREAM_EVENT * event) {
+  return (uint8_t) event->SEND_SHUTDOWN_COMPLETE.Graceful;
+}
+
+struct stream_shutdown_complete_data quic_stream_shutdown_complete_data(QUIC_STREAM_EVENT * event) {
+  struct stream_shutdown_complete_data data;
+  data.connectionShutdown = event->SHUTDOWN_COMPLETE.ConnectionShutdown;
+  data.appCloseInProgress = event->SHUTDOWN_COMPLETE.AppCloseInProgress;
+  data.connectionShutdownByApp = (uint8_t) event->SHUTDOWN_COMPLETE.ConnectionShutdownByApp;
+  data.connectionClosedRemotely = (uint8_t) event->SHUTDOWN_COMPLETE.ConnectionClosedRemotely;
+  data.connectionErrorCode = (uint8_t) event->SHUTDOWN_COMPLETE.ConnectionErrorCode;
+  data.connectionCloseStatus = (uint8_t) event->SHUTDOWN_COMPLETE.ConnectionCloseStatus;
+  return data;
+}
+
+uint64_t stream_event_ideal_send_buffer_size_byte_count(QUIC_STREAM_EVENT * event) {
+  return event->IDEAL_SEND_BUFFER_SIZE.ByteCount;
+}
+
+HQUIC* quic_stream_open_stream(HQUIC* connection, QUIC_STREAM_OPEN_FLAGS flag, void* callback, void* ctx) {
+  HQUIC* stream = NULL;
+  if (MSQuic->StreamOpen(*connection, flag, callback, ctx, stream)) {
+    pony_error();
+    return NULL;
+  };
+  return stream;
+}
+
+void quic_stream_close_stream(HQUIC* stream) {
+  MSQuic->StreamClose(*stream);
+}
+
+void quic_stream_start_stream(HQUIC* stream, QUIC_STREAM_START_FLAGS flag) {
+  if (MSQuic->StreamStart(*stream, flag)) {
+    pony_error();
+  };
 }
