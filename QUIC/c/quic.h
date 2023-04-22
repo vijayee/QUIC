@@ -316,3 +316,4 @@ HQUIC* quic_stream_open_stream(HQUIC* connection, QUIC_STREAM_OPEN_FLAGS flag, v
 void quic_stream_close_stream(HQUIC* stream);
 void quic_stream_start_stream(HQUIC* stream, QUIC_STREAM_START_FLAGS flag);
 void quic_stream_send(HQUIC* stream, uint8_t* buffer, size_t bufferLength);
+void quic_stream_shutdown(HQUIC* stream, QUIC_STREAM_SHUTDOWN_FLAGS flag);

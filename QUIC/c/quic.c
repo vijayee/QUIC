@@ -836,3 +836,9 @@ void quic_stream_send(HQUIC* stream, uint8_t* buffer, size_t bufferLength) {
     pony_error();
   }
 }
+
+void quic_stream_shutdown(HQUIC* stream, QUIC_STREAM_SHUTDOWN_FLAGS flag) {
+  if (MSQuic->StreamShutdown(*stream, flag, 0)) {
+    pony_error();
+  }
+}

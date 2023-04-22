@@ -127,3 +127,4 @@ use @quic_stream_open_stream[Pointer[None] tag](connection: Pointer[None] tag, f
 use @quic_stream_close_stream[None](stream: Pointer[None] tag)
 use @quic_stream_start_stream[None](stream: Pointer[None] tag)?
 use @quic_stream_send[None](stream: Pointer[None] tag, buffer: Pointer[U8] tag, bufferLength: USize)?
+use @quic_stream_shutdown[None](stream: Pointer[None] tag, flag: U32)?

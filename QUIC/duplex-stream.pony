@@ -4,6 +4,25 @@ use "collections"
 
 type QUICStream is (QUICDuplexStream | QUICReadableStream | QUICWriteableStream)
 
+primitive ShutdownGraceful
+  fun apply(): U32 => 0x0001
+
+primitive ShutdownAbortSend
+  fun apply(): U32 => 0x0002
+
+primitive ShutdownAbortReceive
+  fun apply(): U32 => 0x0004
+
+primitive ShutdownAbort
+  fun apply(): U32 => 0x0006
+
+primitive ShutdownImmediate
+  fun apply(): U32 => 0x0008
+
+primitive ShutdownInline
+  fun apply(): U32 => 0x0010
+
+type QUICStreamShutdownFlags is (ShutdownGraceful | ShutdownAbortSend | ShutdownAbortReceive | ShutdownAbort | ShutdownImmediate)
 
 primitive _QUICStreamCallback
   fun apply(strm: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag) : U32 =>
@@ -148,6 +167,8 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
   be write(data: Array[U8] iso) =>
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
+    elseif not _writeable then
+      notifyError(Exception("Stream is closed for writing"))
     else
       let data': Array[U8] = consume data
       try
@@ -160,6 +181,8 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
   be read(cb: {(Array[U8] iso)} val, size: (USize | None) = None) =>
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
+    elseif not _readable then
+      notifyError(Exception("Stream is closed for reading"))
     else
       var size' = match size
       | None => _buffer.size()
@@ -295,10 +318,45 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
     end
 
   be close() =>
-    _close()
+    if _readable and _writeable then
+      try
+        @quic_stream_shutdown(_stream, ShutdownAbort())?
+        _writeable = false
+        _readable = false
+      else
+        notifyError(Exception("Stream failed to shutdown"))
+      end
+      _close()
+    elseif not _readable and _writeable then
+      try
+        @quic_stream_shutdown(_stream, ShutdownGraceful())?
+        _writeable = false
+      else
+        notifyError(Exception("Stream failed to close write path"))
+      end
+      _close()
+    elseif _readable and not _writeable then
+      try
+        @quic_stream_shutdown(_stream, ShutdownAbortReceive())?
+        _readable = false
+      else
+        notifyError(Exception("Stream failed to close read path"))
+      end
+      _close()
+    end
 
   be closeRead() =>
-    _close()
+    try
+      @quic_stream_shutdown(_stream, ShutdownAbortReceive())?
+      _readable = false
+    else
+      notifyError(Exception("Stream failed to close read path"))
+    end
 
   be closeWrite() =>
-    _close()
+    try
+      @quic_stream_shutdown(_stream, ShutdownGraceful())?
+      _writeable = false
+    else
+      notifyError(Exception("Stream failed to close write path"))
+    end

@@ -171,7 +171,7 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
     let subscribers': Subscribers = subscribers()
     subscribers'.clear()
 
-  be close() =>
+  fun ref _close() =>
     if not destroyed() then
        @quic_stream_close_stream(_stream)
       _isDestroyed = true
@@ -180,4 +180,13 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
       subscribers'.clear()
       _pipeNotifiers' = None
       _isPiped = false
+    end
+  be close() =>
+    if not destroyed() then
+      try
+        @quic_stream_shutdown(_stream, ShutdownAbort())?
+      else
+        notifyError(Exception("Stream failed to shutdown"))
+      end
+      _close()
     end

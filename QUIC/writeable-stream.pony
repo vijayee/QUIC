@@ -97,13 +97,20 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
     _isDestroyed = true
     let subscribers': Subscribers = subscribers()
     subscribers'.clear()
-
-  be close() =>
+  fun ref _close() =>
     if not destroyed() then
-      @quic_stream_close_stream(_stream)
-      notifyFinished()
+       @quic_stream_close_stream(_stream)
       _isDestroyed = true
       notifyClose()
       let subscribers': Subscribers = subscribers()
       subscribers'.clear()
+    end
+  be close() =>
+    if not destroyed() then
+      try
+        @quic_stream_shutdown(_stream, ShutdownAbort())?
+      else
+        notifyError(Exception("Stream failed to shutdown"))
+      end
+      _close()
     end
