@@ -815,3 +815,24 @@ void quic_stream_start_stream(HQUIC* stream, QUIC_STREAM_START_FLAGS flag) {
     pony_error();
   };
 }
+void quic_stream_send(HQUIC* stream, uint8_t* buffer, size_t bufferLength) {
+  QUIC_BUFFER* sendBuffer = malloc(sizeof(QUIC_BUFFER));
+  if (sendBuffer == NULL) {
+    pony_error();
+    return;
+  }
+
+  sendBuffer->Buffer = malloc(bufferLength);
+  if (sendBuffer->Buffer  == NULL) {
+    free(sendBuffer);
+    pony_error();
+    return;
+  }
+  memcpy(sendBuffer->Buffer, buffer, bufferLength);
+  sendBuffer->Length = (uint32_t) bufferLength;
+  if (MSQuic->StreamSend(*stream, sendBuffer, 1, 0, sendBuffer)) {
+    free(sendBuffer->Buffer);
+    free(sendBuffer);
+    pony_error();
+  }
+}

@@ -315,3 +315,4 @@ uint64_t quic_stream_event_ideal_send_buffer_size_byte_count(QUIC_STREAM_EVENT *
 HQUIC* quic_stream_open_stream(HQUIC* connection, QUIC_STREAM_OPEN_FLAGS flag, void* callback, void* ctx);
 void quic_stream_close_stream(HQUIC* stream);
 void quic_stream_start_stream(HQUIC* stream, QUIC_STREAM_START_FLAGS flag);
+void quic_stream_send(HQUIC* stream, uint8_t* buffer, size_t bufferLength);

@@ -29,7 +29,7 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
 
   be _dispatchPeerReceiveAborted(data: PeerReceiveAbortedData) =>
     notifyPayload[PeerReceiveAbortedData](PeerReceiveAbortedEvent, data)
-    
+
   be _dispatchPeerSendAborted(data: PeerSendAbortedData) =>
     notifyPayload[PeerSendAbortedData](PeerSendAbortedEvent, data)
 
@@ -49,7 +49,12 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
     else
-      None
+      let data': Array[U8] = consume data
+      try
+        @quic_stream_send(_stream, data'.cpointer(), data'.size())?
+      else
+        notifyError(Exception("Failed to write data"))
+      end
     end
 
   be piped(stream: ReadablePushStream[Array[U8] iso] tag) =>

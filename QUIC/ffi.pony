@@ -126,3 +126,4 @@ use @quic_stream_event_ideal_send_buffer_size_byte_count[U64](event: Pointer[Non
 use @quic_stream_open_stream[Pointer[None] tag](connection: Pointer[None] tag, flag: U32, callback: Pointer[None] tag, ctx: Pointer[None] tag)?
 use @quic_stream_close_stream[None](stream: Pointer[None] tag)
 use @quic_stream_start_stream[None](stream: Pointer[None] tag)?
+use @quic_stream_send[None](stream: Pointer[None] tag, buffer: Pointer[U8] tag, bufferLength: USize)?
