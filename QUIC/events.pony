@@ -214,10 +214,18 @@ trait SendCompleteNotify is PayloadNotify[SendCompleteData]
 primitive SendCompleteEvent is SendCompleteNotify
   fun ref apply(data: SendCompleteData) => None
 
+trait PeerSendShutdownNotify is VoidNotify
+  fun ref apply() => None
+  fun box hash(): USize =>
+    QUICHashspace() + 19
+
+primitive PeerSendShutdownEvent is PeerSendShutdownNotify
+  fun ref apply() => None
+
 trait PeerSendAbortedNotify is PayloadNotify[PeerSendAbortedData]
   fun ref apply(data: PeerSendAbortedData) => None
   fun box hash(): USize =>
-    QUICHashspace() + 19
+    QUICHashspace() + 20
 
 primitive PeerSendAbortedEvent is PeerSendAbortedNotify
   fun ref apply(data: PeerSendAbortedData) => None
@@ -225,7 +233,7 @@ primitive PeerSendAbortedEvent is PeerSendAbortedNotify
 trait PeerReceiveAbortedNotify is PayloadNotify[PeerReceiveAbortedData]
   fun ref apply(data: PeerReceiveAbortedData) => None
   fun box hash(): USize =>
-    QUICHashspace() + 20
+    QUICHashspace() + 21
 
 primitive PeerReceiveAbortedEvent is PeerReceiveAbortedNotify
   fun ref apply(data: PeerReceiveAbortedData) => None
@@ -234,7 +242,7 @@ primitive PeerReceiveAbortedEvent is PeerReceiveAbortedNotify
 trait SendShutdownCompleteNotify is PayloadNotify[SendShutdownCompleteData]
   fun ref apply(data: SendShutdownCompleteData) => None
   fun box hash(): USize =>
-    QUICHashspace() + 21
+    QUICHashspace() + 22
 
 primitive SendShutdownCompleteEvent is SendShutdownCompleteNotify
   fun ref apply(data: SendShutdownCompleteData) => None
@@ -242,7 +250,7 @@ primitive SendShutdownCompleteEvent is SendShutdownCompleteNotify
 trait StreamShutdownCompleteNotify is PayloadNotify[StreamShutdownCompleteData]
   fun ref apply(data: StreamShutdownCompleteData) => None
   fun box hash(): USize =>
-    QUICHashspace() + 22
+    QUICHashspace() + 23
 
 primitive StreamShutdownCompleteEvent is StreamShutdownCompleteNotify
   fun ref apply(data: StreamShutdownCompleteData) => None
@@ -250,7 +258,7 @@ primitive StreamShutdownCompleteEvent is StreamShutdownCompleteNotify
 trait IdealSendBufferSizeNotify is PayloadNotify[IdealSendBufferSizeData]
   fun ref apply(data: IdealSendBufferSizeData) => None
   fun box hash(): USize =>
-    QUICHashspace() + 23
+    QUICHashspace() + 24
 
 primitive IdealSendBufferSizeEvent is IdealSendBufferSizeNotify
   fun ref apply(data: IdealSendBufferSizeData) => None
@@ -258,7 +266,7 @@ primitive IdealSendBufferSizeEvent is IdealSendBufferSizeNotify
 trait PeerAcceptedNotify is VoidNotify
   fun ref apply() => None
   fun box hash(): USize =>
-    QUICHashspace() + 24
+    QUICHashspace() + 25
 
 primitive PeerAcceptedEvent is PeerAcceptedNotify
   fun ref apply() => None

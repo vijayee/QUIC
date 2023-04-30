@@ -204,20 +204,40 @@ primitive IndicatePeerAccept
 
 type QUICStreamStartFlags is (None | Immediate | FailBlocked | ShutdownOnFail | IndicatePeerAccept)
 
+primitive Unspecified
+  fun apply(): U16 =>
+    0
+primitive INET
+  fun apply(): U16 =>
+    2
+primitive INET6
+  fun apply() : U16 =>
+    10
+type QUICAddressFamily is (Unspecified| INET | INET6)
+
 actor QUICConnection is NotificationEmitter
   let _connection: Pointer[None] tag
   let _streams: Array[QUICStream]
   let _ctx: Pointer[None] tag
   let _subscribers: Subscribers
+  let _invalid: Bool
 
-  new create(registration: QUICRegistration, configuration: QUICConfiguration val, ctx: Pointer[None] tag, resumptionTicket: (Array[U8] val | None)) =>
+  new create(registration: QUICRegistration, configuration: QUICConfiguration val, target: String, port: U16, family: QUICAddressFamily = Unspecified, resumptionTicket: (Array[U8] val | None) = None) =>
     _streams = Array[QUICStream](3)
-    _ctx = ctx
+    _ctx = @quic_new_connection_event_context[Pointer[None] tag]()
     _subscribers = Subscribers
     try
-      _connection = @quic_connection_open(registration.registration, addressof this.connectionCallback)?
+      _connection = @quic_connection_open(registration.registration, addressof this.connectionCallback, _ctx)?
+      match resumptionTicket
+        | let resumptionTicket': Array[U8] val =>
+          @quic_connection_set_resumption_ticket(_connection, resumptionTicket'.cpointer(), resumptionTicket'.size().u32())?
+      end
+      @quic_connection_start(_connection, configuration.config, family(), target.cstring(), port)?
+      _invalid = false
     else
       _connection = Pointer[None]
+      _invalid = true
+      notifyError(Exception("Connection is invalid"))
     end
 
   new _serverConnection(conn: Pointer[None] tag, ctx: Pointer[None] tag) =>
@@ -225,11 +245,16 @@ actor QUICConnection is NotificationEmitter
     _connection = conn
     _ctx = ctx
     _subscribers = Subscribers
+    _invalid = false
 
   fun ref subscribers() : Subscribers =>
     _subscribers
 //, cb: {(stream: (S | Exception) )} val
   be openStream[S: (QUICDuplexStream tag | QUICWriteableStream tag) = QUICDuplexStream](cb: {((S | Exception))} val, flag: (QUICStreamOpenFlags | None) = None) =>
+    if _invalid then
+      cb(Exception("Connection is invalid"))
+      return
+    end
     let ctx: Pointer[None] tag = @quic_stream_new_event_context()
     let streamCallback = @{(strm: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag) =>
       _QUICStreamCallback(strm, context, event)
@@ -243,9 +268,11 @@ actor QUICConnection is NotificationEmitter
       @quic_stream_start_stream(strm)?
       iftype S <: QUICWriteableStream then
         let ws: QUICWriteableStream tag = QUICWriteableStream._create(strm, ctx)
+        _streams.push(ws)
         cb(ws)
       elseif S <: QUICDuplexStream then
         let ds: QUICDuplexStream tag = QUICDuplexStream._create(strm, ctx)
+        _streams.push(ds)
         cb(ds)
       end
     else
@@ -404,7 +431,9 @@ actor QUICConnection is NotificationEmitter
       notifyPayload[U16](IdealProcessorChangedEvent, data)
 
     be _dispatchClose() =>
+      @quic_connection_shutdown(_connection)
       notify(CloseEvent)
 
   fun _final()=>
+    @quic_connection_close(_connection)
     @quic_free_connection_event_context(_ctx)

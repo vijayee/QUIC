@@ -842,3 +842,23 @@ void quic_stream_shutdown(HQUIC* stream, QUIC_STREAM_SHUTDOWN_FLAGS flag) {
     pony_error();
   }
 }
+
+void quic_connection_start(HQUIC* connection, HQUIC* configuration, uint16_t family, char * target, uint16_t port) {
+  if (MSQuic->ConnectionStart(*connection, *configuration, family, target, port)) {
+    pony_error();
+  }
+}
+
+void quic_connection_set_resumption_ticket(HQUIC* connection, uint8_t * ticket, uint32_t ticketLength) {
+  if(MSQuic->SetParam(*connection, QUIC_PARAM_CONN_RESUMPTION_TICKET, ticketLength, ticket)) {
+    pony_error();
+  };
+}
+
+void quic_connection_shutdown(HQUIC* connection) {
+  MSQuic->ConnectionShutdown(*connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
+}
+
+void quic_connection_close(HQUIC* connection) {
+  MSQuic->ConnectionClose(*connection);
+}

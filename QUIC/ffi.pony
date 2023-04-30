@@ -47,7 +47,7 @@ use @quic_receive_stream_type[U32](event: Pointer[None] tag)
 use @quic_stream_set_callback[None](stream: QUICStream, streamCallback: Pointer[None] tag, ctx: Pointer[None] tag)
 use @quic_stream_new_event_context[Pointer[None] tag]()
 use @quic_stream_event_context_set_actor[None](ctx: Pointer[None] tag, streamActor: QUICStream)
-use @quic_connection_open[Pointer[None] tag](registration: Pointer[None] tag, callback:Pointer[None] tag)?
+use @quic_connection_open[Pointer[None] tag](registration: Pointer[None] tag, callback:Pointer[None] tag, ctx: Pointer[None] tag)?
 use @quic_free_connection_event_context[None](ctx: Pointer[None] tag)
 use @quic_connection_event_enabled[U8](ctx: Pointer[None] tag, event: Pointer[None] tag)
 use @quic_connection_connected_event_session_negotiated_alpn_length[U8](event: Pointer[None] tag)
@@ -128,3 +128,8 @@ use @quic_stream_close_stream[None](stream: Pointer[None] tag)
 use @quic_stream_start_stream[None](stream: Pointer[None] tag)?
 use @quic_stream_send[None](stream: Pointer[None] tag, buffer: Pointer[U8] tag, bufferLength: USize)?
 use @quic_stream_shutdown[None](stream: Pointer[None] tag, flag: U32)?
+
+use @quic_connection_start[None](connection:Pointer[None] tag, configurgation: Pointer[None] tag, family: U16, target: Pointer[U8] tag, port:U16)?
+use @quic_connection_set_resumption_ticket[None](connection: Pointer[None] tag, ticket: Pointer[U8] tag, ticketLength: U32)?
+use @quic_connection_close[None](connection: Pointer[None] tag)
+use @quic_connection_shutdown[None](connection: Pointer[None] tag)  

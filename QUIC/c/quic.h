@@ -317,3 +317,7 @@ void quic_stream_close_stream(HQUIC* stream);
 void quic_stream_start_stream(HQUIC* stream, QUIC_STREAM_START_FLAGS flag);
 void quic_stream_send(HQUIC* stream, uint8_t* buffer, size_t bufferLength);
 void quic_stream_shutdown(HQUIC* stream, QUIC_STREAM_SHUTDOWN_FLAGS flag);
+void quic_connection_start(HQUIC* connection, HQUIC* configuration, uint16_t family, char * target, uint16_t port);
+void quic_connection_set_resumption_ticket(HQUIC* connection, uint8_t * ticket, uint32_t ticketLength);
+void quic_connection_shutdown(HQUIC* connection);
+void quic_connection_close(HQUIC* connection);

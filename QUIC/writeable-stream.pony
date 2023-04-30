@@ -20,6 +20,7 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
 
   fun _final() =>
     @quic_free(_ctx)
+    @quic_stream_close_stream(_stream)
 
   be _dispatchStreamStartComplete(data: StreamStartCompleteData) =>
     notifyPayload[StreamStartCompleteData](StreamStartCompleteEvent, data)
@@ -27,7 +28,11 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
   be _dispatchSendComplete(data: SendCompleteData) =>
     notifyPayload[SendCompleteData](SendCompleteEvent, data)
 
+  be _dispatchPeerSendShutdown() =>
+    notify(PeerSendShutdownEvent)
+
   be _dispatchPeerReceiveAborted(data: PeerReceiveAbortedData) =>
+    _shutdown()
     notifyPayload[PeerReceiveAbortedData](PeerReceiveAbortedEvent, data)
 
   be _dispatchPeerSendAborted(data: PeerSendAbortedData) =>
@@ -97,6 +102,7 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
     _isDestroyed = true
     let subscribers': Subscribers = subscribers()
     subscribers'.clear()
+    
   fun ref _close() =>
     if not destroyed() then
        @quic_stream_close_stream(_stream)
@@ -105,12 +111,16 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
       let subscribers': Subscribers = subscribers()
       subscribers'.clear()
     end
+
+  fun ref _shutdown() =>
+    try
+      @quic_stream_shutdown(_stream, ShutdownAbort())?
+    else
+      notifyError(Exception("Stream failed to shutdown"))
+    end
+    _close()
+
   be close() =>
     if not destroyed() then
-      try
-        @quic_stream_shutdown(_stream, ShutdownAbort())?
-      else
-        notifyError(Exception("Stream failed to shutdown"))
-      end
-      _close()
+      _shutdown()
     end

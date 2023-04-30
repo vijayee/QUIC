@@ -50,10 +50,9 @@ primitive _QUICStreamCallback
     | 2 =>
       let data: SendCompleteData = SendCompleteData(@quic_stream_event_send_shutdown_complete_graceful(event) == 1)
       stream._dispatchSendComplete(data)
-      //QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN
+    //QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN
     | 3 =>
-      let data: SendShutdownCompleteData = SendShutdownCompleteData(@quic_stream_event_send_shutdown_complete_graceful(event) == 1 )
-      stream._dispatchSendShutdownComplete(data)
+      stream._dispatchPeerSendShutdown()
     //QUIC_STREAM_EVENT_PEER_SEND_ABORTED
     | 4 =>
       let data: PeerSendAbortedData = PeerSendAbortedData(@quic_stream_event_peer_send_aborted_error_code(event))
@@ -96,6 +95,7 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
   let _stream: Pointer[None] tag
   let _buffer: RingBuffer[U8]
   let _ctx: Pointer[None] tag
+  var _auto : Bool = false
 
   new _create(stream: Pointer[None] tag, ctx: Pointer[None] tag) =>
     _subscribers' = Subscribers(3)
@@ -112,8 +112,12 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
   fun readable(): Bool =>
     _readable
 
+  fun ref autoPush() : Bool =>
+    _auto
+
   fun _final() =>
     @quic_free(_ctx)
+    @quic_stream_close_stream(_stream)
 
   be _receive(event: Pointer[None] tag) =>
     let data: Array[U8] iso = recover
@@ -123,6 +127,28 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
       let data': Array[U8] = Array[U8].from_cpointer(buffer, size)
       data'
     end
+
+    let bufferEmpty: Bool = (_buffer.size() == 0)
+    let hasDataSubscribers = (subscriberCount(DataEvent[Array[U8] iso]) > 0)
+    if not hasDataSubscribers then
+      let data': Array[U8] val = consume data
+      for i in data'.values() do
+        _buffer.push(i)
+      end
+      _auto = true
+      return
+    elseif hasDataSubscribers and bufferEmpty then
+      let start: I64 = try ((_buffer.head()? + _buffer.size()) -? 1).i64() else 0 end
+      let stop : I64 = try (_buffer.head()? -? 1).i64() else 0 end
+      try
+        for i in Range[I64](start, stop , -1) do
+          data.unshift(_buffer(i.usize())?)
+        end
+        _buffer.clear()
+      else
+        notifyError(Exception("Buffer failed to clear"))
+      end
+    end
     notifyData(consume data)
 
   be _dispatchStreamStartComplete(data: StreamStartCompleteData) =>
@@ -131,13 +157,39 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
   be _dispatchSendComplete(data: SendCompleteData) =>
     notifyPayload[SendCompleteData](SendCompleteEvent, data)
 
+  be _dispatchPeerSendShutdown() =>
+    _readable = false
+    notify(PeerSendShutdownEvent)
+
   be _dispatchSendShutdownComplete(data: SendShutdownCompleteData) =>
     notifyPayload[SendShutdownCompleteData](SendShutdownCompleteEvent, data)
 
   be _dispatchPeerReceiveAborted(data: PeerReceiveAbortedData) =>
+    _writeable = false
+
+    //TODO is this correct behavior?
+    if not _readable and not _writeable then
+      try
+        @quic_stream_shutdown(_stream, ShutdownGraceful())?
+        _writeable = false
+      else
+        notifyError(Exception("Stream failed to close"))
+      end
+      _close()
+    end
     notifyPayload[PeerReceiveAbortedData](PeerReceiveAbortedEvent, data)
 
   be _dispatchPeerSendAborted(data: PeerSendAbortedData) =>
+    _readable = false
+    if (_buffer.size() == 0) and not _readable and not _writeable then
+      try
+        @quic_stream_shutdown(_stream, ShutdownGraceful())?
+        _writeable = false
+      else
+        notifyError(Exception("Stream failed to close"))
+      end
+      _close()
+    end
     notifyPayload[PeerSendAbortedData](PeerSendAbortedEvent, data)
 
   be _dispatchStreamShutdownComplete(data: StreamShutdownCompleteData) =>
@@ -152,16 +204,24 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
   be push() =>
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
+    elseif (not _readable) and (_buffer.size() == 0) then
+      notifyError(Exception("Stream is closed for reading"))
     else
-      None
-      /*
-      notifyData(consume chunk)
-      if (_file.size() == _file.position()) then
-        notifyComplete()
-        closeRead()
+      if _buffer.size() == 0 then
+        return
+      end
+      let size' = _buffer.size()
+      let data = recover Array[U8](size') end
+      try
+        let stop: USize = _buffer.head()? + _buffer.size()
+        for i in Range(_buffer.head()?, stop) do
+          data.push(_buffer(i)?)
+        end
+        notifyData(consume data)
+        _buffer.clear()
       else
-        push()
-      end*/
+        notifyError(Exception("Failed to read buffer"))
+      end
     end
 
   be write(data: Array[U8] iso) =>

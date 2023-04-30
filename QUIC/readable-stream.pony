@@ -8,7 +8,7 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
   let _subscribers': Subscribers
   var _pipeNotifiers': (Array[Notify tag] iso | None) = None
   var _isPiped: Bool = false
-  let _auto: Bool = false
+  var _auto: Bool = false
   let _ctx: Pointer[None] tag
   let _stream: Pointer[None] tag
   let _buffer: RingBuffer[U8]
@@ -21,6 +21,7 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
 
   fun _final() =>
     @quic_free(_ctx)
+    @quic_stream_close_stream(_stream)
 
   fun readable(): Bool =>
     _readable
@@ -48,6 +49,28 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
       let data': Array[U8] = Array[U8].from_cpointer(buffer, size)
       data'
     end
+
+    let bufferEmpty: Bool = (_buffer.size() == 0)
+    let hasDataSubscribers = (subscriberCount(DataEvent[Array[U8] iso]) > 0)
+    if not hasDataSubscribers then
+      let data': Array[U8] val = consume data
+      for i in data'.values() do
+        _buffer.push(i)
+      end
+      _auto = true
+      return
+    elseif hasDataSubscribers and bufferEmpty then
+      let start: I64 = try ((_buffer.head()? + _buffer.size()) -? 1).i64() else 0 end
+      let stop : I64 = try (_buffer.head()? -? 1).i64() else 0 end
+      try
+        for i in Range[I64](start, stop , -1) do
+          data.unshift(_buffer(i.usize())?)
+        end
+        _buffer.clear()
+      else
+        notifyError(Exception("Buffer failed to clear"))
+      end
+    end
     notifyData(consume data)
 
   be _dispatchStreamStartComplete(data: StreamStartCompleteData) =>
@@ -58,6 +81,11 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
 
   be _dispatchPeerReceiveAborted(data: PeerReceiveAbortedData) =>
     notifyPayload[PeerReceiveAbortedData](PeerReceiveAbortedEvent, data)
+
+  be _dispatchPeerSendShutdown() =>
+    _readable = false
+    _shutdown()
+    notify(PeerSendShutdownEvent)
 
   be _dispatchPeerSendAborted(data: PeerSendAbortedData) =>
     notifyPayload[PeerSendAbortedData](PeerSendAbortedEvent, data)
@@ -77,14 +105,31 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
   be push() =>
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
+    elseif (not _readable) and (_buffer.size() == 0) then
+      notifyError(Exception("Stream is closed for reading"))
     else
-      None
-      //notifyData(consume chunk)
+      if _buffer.size() == 0 then
+        return
+      end
+      let size' = _buffer.size()
+      let data = recover Array[U8](size') end
+      try
+        let stop: USize = _buffer.head()? + _buffer.size()
+        for i in Range(_buffer.head()?, stop) do
+          data.push(_buffer(i)?)
+        end
+        notifyData(consume data)
+        _buffer.clear()
+      else
+        notifyError(Exception("Failed to read buffer"))
+      end
     end
 
   be read(cb: {(Array[U8] iso)} val, size: (USize | None) = None) =>
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
+    elseif not _readable then
+      notifyError(Exception("Stream is closed for reading"))
     else
       var size' = match size
       | None => _buffer.size()
@@ -181,12 +226,16 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
       _pipeNotifiers' = None
       _isPiped = false
     end
+
+  fun ref _shutdown() =>
+    try
+      @quic_stream_shutdown(_stream, ShutdownAbort())?
+    else
+      notifyError(Exception("Stream failed to shutdown"))
+    end
+    _close()
+
   be close() =>
     if not destroyed() then
-      try
-        @quic_stream_shutdown(_stream, ShutdownAbort())?
-      else
-        notifyError(Exception("Stream failed to shutdown"))
-      end
-      _close()
+      _shutdown()
     end
