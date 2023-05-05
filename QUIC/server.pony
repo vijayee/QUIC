@@ -28,6 +28,34 @@ actor QUICServer is NotificationEmitter
 
   be _acceptNewConnection(connection: QUICConnection) =>
     _connections.push(connection)
+    let onclose: CloseNotify iso= object iso is CloseNotify
+      let _server: QUICServer = this
+      let _connection: QUICConnection = connection
+      fun ref apply() =>
+          _server._removeConnection(_connection)
+    end
+    connection.subscribe(consume onclose)
+
+  be _removeConnection(connection: QUICConnection) =>
+    var i: USize = 0
+    var found: Bool = false
+    for conn in _connections.values() do
+      if conn is connection then
+        found = true
+      end
+      i = i + 1
+    end
+    if found then
+      _connections.remove(i, 1)
+    end
+
+  be getConnections(cb: {(Array[QUICConnection] val)} val) =>
+    let size = _connections.size()
+    let connections: Array[QUICConnection] iso = recover Array[QUICConnection](size) end
+    for conn in _connections.values() do
+      connections.push(conn)
+    end
+    cb(consume connections)
 
   fun @serverCallback(ctx: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
     if @quic_is_new_connection_event(event) == 1 then

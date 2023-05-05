@@ -269,10 +269,24 @@ actor QUICConnection is NotificationEmitter
       iftype S <: QUICWriteableStream then
         let ws: QUICWriteableStream tag = QUICWriteableStream._create(strm, ctx)
         _streams.push(ws)
+        let onclose: CloseNotify iso= object iso is CloseNotify
+          let _connection: QUICConnection = this
+          let _stream: QUICStream = ws
+          fun ref apply() =>
+            _connection._removeStream(_stream)
+        end
+        ws.subscribe(consume onclose)
         cb(ws)
       elseif S <: QUICDuplexStream then
         let ds: QUICDuplexStream tag = QUICDuplexStream._create(strm, ctx)
         _streams.push(ds)
+        let onclose: CloseNotify iso= object iso is CloseNotify
+          let _connection: QUICConnection = this
+          let _stream: QUICStream = ds
+          fun ref apply() =>
+            _connection._removeStream(_stream)
+        end
+        ds.subscribe(consume onclose)
         cb(ds)
       end
     else
@@ -282,23 +296,35 @@ actor QUICConnection is NotificationEmitter
 
   be _receiveNewStream(stream: QUICStream) =>
     _streams.push(stream)
+    let onclose: CloseNotify iso= object iso is CloseNotify
+      let _connection: QUICConnection = this
+      let _stream: QUICStream = stream
+      fun ref apply() =>
+        _connection._removeStream(_stream)
+    end
+    stream.subscribe(consume onclose)
     _dispatchPeerStreamStarted(stream)
 
   be _removeStream(stream: QUICStream) =>
     var i: USize = 0
     var found: Bool = false
     for strm in _streams.values() do
-      if stream is strm then
+      if strm is stream then
         found = true
-        break
-      else
-        i = i + 1
       end
-      if found then
-        try _streams.delete(i)? end
-      end
+      i = i + 1
+    end
+    if found then
+      _streams.remove(i, 1)
     end
 
+  be getStreams(cb: {(Array[QUICStream] val)} val) =>
+    let size = _streams.size()
+    let streams: Array[QUICStream] iso = recover Array[QUICStream tag](size) end
+    for strm in _streams.values() do
+      streams.push(strm)
+    end
+    cb(consume streams)
 
   fun @connectionCallback(conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
     _QUICConnectionCallback(conn, context, event)
