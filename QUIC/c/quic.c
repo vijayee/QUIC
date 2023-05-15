@@ -1,6 +1,7 @@
 #include "quic.h"
 #include <pony.h>
 #include <string.h>
+#include <stdio.h>
 #if _WIN32
   #include <windows.h>
 #else
@@ -275,17 +276,25 @@ QUIC_SETTINGS* quic_new_settings(struct quic_setting_value_uint64_t maxBytesPerK
 
   return settings;
 }
-HQUIC* quic_new_configuration(HQUIC* registration, QUIC_BUFFER* alpn, uint32_t alpnSize, QUIC_SETTINGS* settings) {
+HQUIC* quic_new_configuration(HQUIC* registration, char** alpn, uint32_t alpnSize, QUIC_SETTINGS* settings) {
   HQUIC* configuration = malloc(sizeof(HQUIC));
-  if (QUIC_FAILED(MSQuic->ConfigurationOpen(*registration, alpn, alpnSize, settings, sizeof(*settings), NULL, configuration))) {
-        pony_error();
-        return NULL;
+  QUIC_BUFFER alpns[alpnSize];
+
+  for (int i = 0; i < alpnSize; i++) {
+    alpns[i] = (QUIC_BUFFER) { .Length = strlen(alpn[i]), .Buffer = (uint8_t*) alpn[i] };
+  }
+
+  if (QUIC_FAILED(MSQuic->ConfigurationOpen(*registration, (const QUIC_BUFFER* const)&alpns, alpnSize, settings, sizeof(*settings), NULL, configuration))) {
+    pony_error();
+    return NULL;
   }
   return configuration;
 }
 
 void quic_configuration_load_credential(HQUIC* configuration, QUIC_CREDENTIAL_CONFIG* credentials) {
-  if (QUIC_FAILED(MSQuic->ConfigurationLoadCredential(*configuration, credentials))) {
+  QUIC_STATUS Status;
+  if (QUIC_FAILED(Status = MSQuic->ConfigurationLoadCredential(*configuration, credentials))) {
+    printf("%u\n", Status);
     pony_error();
   }
 }
@@ -697,16 +706,16 @@ QUIC_ADDR* quic_connection_event_peer_address_changed_data(QUIC_CONNECTION_EVENT
   memcpy(addr, &event->PEER_ADDRESS_CHANGED.Address, sizeof(event->PEER_ADDRESS_CHANGED.Address));
   return addr;
 }
-void quic_connect_event_streams_available_data(QUIC_CONNECTION_EVENT* event, struct streams_available_data* data) {
+void quic_connection_event_streams_available_data(QUIC_CONNECTION_EVENT* event, struct streams_available_data* data) {
   data->bidirectionalCount = event->STREAMS_AVAILABLE.BidirectionalCount;
   data->unidirectionalCount = event->STREAMS_AVAILABLE.UnidirectionalCount;
 }
 
-uint8_t quic_connect_event_peer_needs_streams_data(QUIC_CONNECTION_EVENT* event) {
+uint8_t quic_connection_event_peer_needs_streams_data(QUIC_CONNECTION_EVENT* event) {
   return (uint8_t)event->PEER_NEEDS_STREAMS.Bidirectional;
 }
 
-uint16_t quic_connect_event_ideal_processor_changed_data(QUIC_CONNECTION_EVENT* event) {
+uint16_t quic_connection_event_ideal_processor_changed_data(QUIC_CONNECTION_EVENT* event) {
   return event->IDEAL_PROCESSOR_CHANGED.IdealProcessor;
 }
 
@@ -793,7 +802,7 @@ struct stream_shutdown_complete_data quic_stream_shutdown_complete_data(QUIC_STR
   return data;
 }
 
-uint64_t stream_event_ideal_send_buffer_size_byte_count(QUIC_STREAM_EVENT * event) {
+uint64_t quic_stream_event_ideal_send_buffer_size_byte_count(QUIC_STREAM_EVENT * event) {
   return event->IDEAL_SEND_BUFFER_SIZE.ByteCount;
 }
 
@@ -862,3 +871,15 @@ void quic_connection_shutdown(HQUIC* connection) {
 void quic_connection_close(HQUIC* connection) {
   MSQuic->ConnectionClose(*connection);
 }
+
+uint8_t quic_server_resumption_no_resume() {
+  return (uint8_t) QUIC_SERVER_NO_RESUME;
+}
+uint8_t quic_server_resumption_resume_only() {
+  return (uint8_t) QUIC_SERVER_RESUME_ONLY;
+}
+uint8_t quic_server_resumption_resume_and_zerortt() {
+  return (uint8_t) QUIC_SERVER_RESUME_AND_ZERORTT;
+};
+
+size_t quic_buffer_allocation_size(size_t count);

@@ -69,7 +69,7 @@ type QUICAllowedCipherSuiteFlags is Array[QUICAllowedCipherSuiteFlag]
 class val QUICCredentials
   let cred: Pointer[None] tag
   let certificate: QUICCertificate
-  new create(certificate': QUICCertificate, flags': QUICCredentialsFlags = [], allowedCipherSuiteFlags: QUICAllowedCipherSuiteFlags = [], caCertificateFile: (String | None) = None ) =>
+  new val create(certificate': QUICCertificate, flags': QUICCredentialsFlags val = [], allowedCipherSuiteFlags: QUICAllowedCipherSuiteFlags val = [], caCertificateFile: (String | None) = None ) =>
     certificate = certificate'
     var flags: U64 = 0
     for flag in flags'.values() do
@@ -92,10 +92,10 @@ class val QUICCredentials
 class val QUICCertificate
   let cert: Pointer[None] tag
   let credType: I32
-  new create(certificateFile: String, privateKeyFile: String, password: (String | None) = None) =>
+  new val create(certificateFile: String, privateKeyFile: String, password: (String | None) = None) =>
     match password
     | None =>
-      cert = @quic_certificate_file(certificateFile.cstring(), privateKeyFile.cstring())
+      cert = @quic_certificate_file(privateKeyFile.cstring(), certificateFile.cstring())
       credType = 4
     | let password': String =>
       cert = @quic_certificate_file_protected(certificateFile.cstring(), privateKeyFile.cstring(), password'.cstring())

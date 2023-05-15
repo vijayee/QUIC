@@ -28,7 +28,7 @@ class QUICSettings
   var pacingEnabled: (Bool | None) = None
   var migrationEnabled: (Bool | None) = None
   var datagramReceiveEnabled: (Bool | None) = None
-  var serverResumptionLevel: (Bool | None) = None
+  var serverResumptionLevel: (U8 | None) = None
   var greaseQuicBitEnabled: (Bool | None) = None
   var ecnEnabled: (Bool | None) = None
   var maxOperationsPerDrain: (U8 | None) = None

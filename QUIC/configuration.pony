@@ -5,9 +5,9 @@ struct QUICSettingValue[A: (U8 val | U16 val | U32 val | U64 val)]
     set = set'
     value = value'
 
-class QUICConfiguration
+class val QUICConfiguration
   let config: Pointer[None] tag
-  new create(registration: QUICRegistration, alpn: Array[String], settings: QUICSettings, credentials: QUICCredentials) ? =>
+  new val create(registration: QUICRegistration, alpn: Array[String] val, settings: QUICSettings val, credentials: QUICCredentials) ? =>
     let quicsettings: Pointer[None] tag = @quic_new_settings(
       try QUICSettingValue[U64]((settings.maxBytesPerKey as U64), 1) else QUICSettingValue[U64](0,0) end,
       try QUICSettingValue[U64]((settings.handshakeIdleTimeoutMs as U64), 1) else QUICSettingValue[U64](0,0) end,
@@ -37,20 +37,19 @@ class QUICConfiguration
       try QUICSettingValue[U8](if (settings.pacingEnabled as Bool) then 1 else 0 end, 1) else QUICSettingValue[U8](0,0) end,
       try QUICSettingValue[U8](if (settings.migrationEnabled as Bool) then 1 else 0 end, 1) else QUICSettingValue[U8](0,0) end,
       try QUICSettingValue[U8](if (settings.datagramReceiveEnabled as Bool) then 1 else 0 end, 1) else QUICSettingValue[U8](0,0) end,
-      try QUICSettingValue[U8](if (settings.serverResumptionLevel as Bool) then 1 else 0 end, 1) else QUICSettingValue[U8](0,0) end,
+      try QUICSettingValue[U8]((settings.serverResumptionLevel as U8), 1) else QUICSettingValue[U8](0,0) end,
       try QUICSettingValue[U8](if (settings.greaseQuicBitEnabled as Bool) then 1 else 0 end, 1) else QUICSettingValue[U8](0,0) end,
       try QUICSettingValue[U8](if (settings.ecnEnabled as Bool) then 1 else 0 end, 1) else QUICSettingValue[U8](0,0) end,
       try QUICSettingValue[U8]((settings.maxOperationsPerDrain as U8), 1) else QUICSettingValue[U8](0,0) end,
       try QUICSettingValue[U8]((settings.mtuDiscoveryMissingProbeCount as U8), 1) else QUICSettingValue[U8](0,0) end,
       try QUICSettingValue[U32]((settings.destCidUpdateIdleTimeoutMs as U32), 1) else QUICSettingValue[U32](0,0) end
       )
-      let alpn': Array[QUICBuffer] = Array[QUICBuffer](alpn.size())
+      let alpn': Array[Pointer[U8] tag] = Array[Pointer[U8] tag](alpn.size())
       for app in alpn.values() do
-        alpn'.push(QUICBuffer(app.size().u32(), app.cstring()))
+        alpn'.push(app.cstring())
       end
       try
-        config = @quic_new_configuration(registration.registration, alpn'.cpointer(), alpn.size().u32(), quicsettings)?
-        @quic_free(quicsettings)
+        config = @quic_new_configuration(registration.registration, alpn'.cpointer(), alpn.size().u32(), quicsettings, QUICBuffer(0, Pointer[U8]))?
         @quic_configuration_load_credential(config, credentials.cred)?
         @quic_free(quicsettings)
       else

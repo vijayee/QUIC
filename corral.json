@@ -6,6 +6,10 @@
     {
       "locator": "github.com/vijayee/Streams.git",
       "version": "0.1.1"
+    },
+    {
+      "locator": "github.com/vijayee/Print.git",
+      "version": "0.0.1"
     }
   ],
   "info": {

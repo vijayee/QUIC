@@ -1,4 +1,7 @@
-use @quic_new_configuration[Pointer[None] tag](registration:Pointer[None] tag, alpn: Pointer[QUICBuffer] tag, alpnSize: U32, settings: Pointer[None])?
+use "lib:numa"
+use "lib:msquic"
+use "lib:ponyquic"
+use @quic_new_configuration[Pointer[None] tag](registration:Pointer[None] tag, alpn: Pointer[Pointer[U8]tag] tag, alpnSize: U32, settings: Pointer[None], buf: QUICBuffer)?
 use @quic_new_settings[Pointer[None] tag](maxBytesPerKey: QUICSettingValue[U64] tag,
     handshakeIdleTimeoutMs: QUICSettingValue[U64] tag,
     idleTimeoutMs: QUICSettingValue[U64] tag,
@@ -132,4 +135,7 @@ use @quic_stream_shutdown[None](stream: Pointer[None] tag, flag: U32)?
 use @quic_connection_start[None](connection:Pointer[None] tag, configurgation: Pointer[None] tag, family: U16, target: Pointer[U8] tag, port:U16)?
 use @quic_connection_set_resumption_ticket[None](connection: Pointer[None] tag, ticket: Pointer[U8] tag, ticketLength: U32)?
 use @quic_connection_close[None](connection: Pointer[None] tag)
-use @quic_connection_shutdown[None](connection: Pointer[None] tag)  
+use @quic_connection_shutdown[None](connection: Pointer[None] tag)
+use @quic_server_resumption_no_resume[U8]()
+use @quic_server_resumption_resume_only[U8]()
+use @quic_server_resumption_resume_and_zerortt[U8]()

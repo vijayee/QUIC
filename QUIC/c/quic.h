@@ -73,7 +73,7 @@ QUIC_SETTINGS* quic_new_settings(struct quic_setting_value_uint64_t maxBytesPerK
     struct quic_setting_value_uint8_t maxOperationsPerDrain,
     struct quic_setting_value_uint8_t mtuDiscoveryMissingProbeCount,
     struct quic_setting_value_uint32_t destCidUpdateIdleTimeoutMs);
-HQUIC* quic_new_configuration(HQUIC* registration, QUIC_BUFFER* alpn, uint32_t alpnSize, QUIC_SETTINGS* settings);
+HQUIC* quic_new_configuration(HQUIC* registration, char** alpn, uint32_t alpnSize, QUIC_SETTINGS* settings);
 void quic_configuration_load_credential(HQUIC* configuration, QUIC_CREDENTIAL_CONFIG* credentials);
 uint8_t quic_is_new_connection_event(QUIC_LISTENER_EVENT* event);
 struct quic_server_event_context {
@@ -321,3 +321,11 @@ void quic_connection_start(HQUIC* connection, HQUIC* configuration, uint16_t fam
 void quic_connection_set_resumption_ticket(HQUIC* connection, uint8_t * ticket, uint32_t ticketLength);
 void quic_connection_shutdown(HQUIC* connection);
 void quic_connection_close(HQUIC* connection);
+
+uint8_t quic_server_resumption_no_resume();
+uint8_t quic_server_resumption_resume_only();
+uint8_t quic_server_resumption_resume_and_zerortt();
+
+
+
+//size_t quic_buffer_allocation_size(size_t count);

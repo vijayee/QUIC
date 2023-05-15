@@ -1,6 +1,16 @@
 use "collections"
 use "Streams"
 
+primitive NoResume
+  fun apply(): U8 =>
+    @quic_server_resumption_no_resume()
+primitive ResumeOnly
+  fun apply(): U8 =>
+    @quic_server_resumption_resume_only()
+primitive ResumeAndZeroRTT
+  fun apply(): U8 =>
+    @quic_server_resumption_resume_and_zerortt()
+
 actor QUICServer is NotificationEmitter
   let _subscribers: Subscribers
   let _registration: QUICRegistration
