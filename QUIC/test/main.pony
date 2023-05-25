@@ -17,3 +17,11 @@ class iso _TestRegistrationCreation is UnitTest
       else
         t.fail("Registration Error")
       end
+class iso _TestConfigurationCreation is UnitTest
+    fun name(): String => "Testing Registration Creation"
+    fun apply(t: TestHelper) =>
+      try
+        let registration = QUICRegistration(t.env.root, "test")?
+      else
+        t.fail("Registration Error")
+      end

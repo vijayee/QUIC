@@ -205,14 +205,15 @@ primitive IndicatePeerAccept
 type QUICStreamStartFlags is (None | Immediate | FailBlocked | ShutdownOnFail | IndicatePeerAccept)
 
 primitive Unspecified
-  fun apply(): U16 =>
-    0
+  fun apply(): I32 =>
+    @quic_address_family_unspecified()
 primitive INET
-  fun apply(): U16 =>
-    2
+  fun apply(): I32 =>
+    @quic_address_family_inet()
 primitive INET6
-  fun apply() : U16 =>
-    10
+  fun apply() : I32 =>
+    @quic_address_family_inet6()
+    
 type QUICAddressFamily is (Unspecified| INET | INET6)
 
 actor QUICConnection is NotificationEmitter

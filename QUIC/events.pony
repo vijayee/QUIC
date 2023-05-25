@@ -270,3 +270,19 @@ trait PeerAcceptedNotify is VoidNotify
 
 primitive PeerAcceptedEvent is PeerAcceptedNotify
   fun ref apply() => None
+
+trait ListenerStartedNotify is VoidNotify
+  fun ref apply() => None
+  fun box hash(): USize =>
+    QUICHashspace() + 26
+
+primitive ListenerStartedEvent is ListenerStartedNotify
+  fun ref apply() => None
+
+trait ListenerStoppedNotify is VoidNotify
+  fun ref apply() => None
+  fun box hash(): USize =>
+    QUICHashspace() + 27
+
+primitive ListenerStoppedEvent is ListenerStoppedNotify
+  fun ref apply() => None

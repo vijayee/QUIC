@@ -22,11 +22,14 @@ class iso _TestServer is UnitTest
           settings'
         end
 
-          let certificate: QUICCertificate = QUICCertificate("./server1.crt", "./server1.key")
+        let certificate: QUICCertificate = QUICCertificate("./server1.crt", "./server1.key")
         let credentials: QUICCredentials = QUICCredentials(certificate)
         try
           let configuration: QUICConfiguration = QUICConfiguration(registration, ["this"], consume settings, credentials)?
+          //configuration.close()
           let server = QUICServer(registration, configuration)
+          server.listen(9090)
+          //server.close()
         else
           t.fail("Configuration Error")
         end

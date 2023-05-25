@@ -2,6 +2,8 @@
 #include <pony.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #if _WIN32
   #include <windows.h>
 #else
@@ -852,7 +854,7 @@ void quic_stream_shutdown(HQUIC* stream, QUIC_STREAM_SHUTDOWN_FLAGS flag) {
   }
 }
 
-void quic_connection_start(HQUIC* connection, HQUIC* configuration, uint16_t family, char * target, uint16_t port) {
+void quic_connection_start(HQUIC* connection, HQUIC* configuration, int family, char * target, uint16_t port) {
   if (MSQuic->ConnectionStart(*connection, *configuration, family, target, port)) {
     pony_error();
   }
@@ -882,4 +884,54 @@ uint8_t quic_server_resumption_resume_and_zerortt() {
   return (uint8_t) QUIC_SERVER_RESUME_AND_ZERORTT;
 };
 
-size_t quic_buffer_allocation_size(size_t count);
+void quic_server_listener_start(HQUIC* listener, char** alpn, uint32_t alpnSize, int family, char* ip, char* port) {
+  struct addrinfo hints;
+  memset(&hints, 0, sizeof(struct addrinfo));
+  hints.ai_flags = AI_ADDRCONFIG;
+  hints.ai_family = family;
+  hints.ai_socktype = SOCK_DGRAM;
+  hints.ai_protocol = IPPROTO_UDP;
+  if((ip != NULL) && (ip[0] == '\0'))
+    ip = NULL;
+
+  struct addrinfo* result;
+
+  if (getaddrinfo(ip, port, &hints, &result) != 0) {
+    pony_error();
+    return;
+  }
+  QUIC_ADDR address = {0};
+  address.Ip = *result->ai_addr;
+
+  QUIC_BUFFER alpns[alpnSize];
+
+  for (int i = 0; i < alpnSize; i++) {
+    alpns[i] = (QUIC_BUFFER) { .Length = strlen(alpn[i]), .Buffer = (uint8_t*) alpn[i] };
+  }
+  if (QUIC_FAILED(MSQuic->ListenerStart(*listener, (const QUIC_BUFFER* const)&alpns, alpnSize, &address))) {
+    freeaddrinfo(result);
+    pony_error();
+    return;
+  }
+  freeaddrinfo(result);
+}
+
+int quic_address_family_unspecified() {
+  return AF_UNSPEC;
+}
+
+int quic_address_family_inet() {
+  return AF_INET;
+}
+
+int quic_address_family_inet6() {
+  return AF_INET6;
+}
+
+void quic_server_listener_stop(HQUIC* listener) {
+  MSQuic->ListenerStop(*listener);
+}
+
+void quic_configuration_close(HQUIC* configuration) {
+  MSQuic->ConfigurationClose(*configuration);
+}

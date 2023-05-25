@@ -7,7 +7,8 @@ struct QUICSettingValue[A: (U8 val | U16 val | U32 val | U64 val)]
 
 class val QUICConfiguration
   let config: Pointer[None] tag
-  new val create(registration: QUICRegistration, alpn: Array[String] val, settings: QUICSettings val, credentials: QUICCredentials) ? =>
+  let alpn: Array[String] val
+  new val create(registration: QUICRegistration, alpn': Array[String] val, settings: QUICSettings val, credentials: QUICCredentials) ? =>
     let quicsettings: Pointer[None] tag = @quic_new_settings(
       try QUICSettingValue[U64]((settings.maxBytesPerKey as U64), 1) else QUICSettingValue[U64](0,0) end,
       try QUICSettingValue[U64]((settings.handshakeIdleTimeoutMs as U64), 1) else QUICSettingValue[U64](0,0) end,
@@ -44,12 +45,13 @@ class val QUICConfiguration
       try QUICSettingValue[U8]((settings.mtuDiscoveryMissingProbeCount as U8), 1) else QUICSettingValue[U8](0,0) end,
       try QUICSettingValue[U32]((settings.destCidUpdateIdleTimeoutMs as U32), 1) else QUICSettingValue[U32](0,0) end
       )
-      let alpn': Array[Pointer[U8] tag] = Array[Pointer[U8] tag](alpn.size())
-      for app in alpn.values() do
-        alpn'.push(app.cstring())
+      let alpn'': Array[Pointer[U8] tag] = Array[Pointer[U8] tag](alpn'.size())
+      for app in alpn'.values() do
+        alpn''.push(app.cstring())
       end
+      alpn = alpn'
       try
-        config = @quic_new_configuration(registration.registration, alpn'.cpointer(), alpn.size().u32(), quicsettings, QUICBuffer(0, Pointer[U8]))?
+        config = @quic_new_configuration(registration.registration, alpn''.cpointer(), alpn''.size().u32(), quicsettings, QUICBuffer(0, Pointer[U8]))?
         @quic_configuration_load_credential(config, credentials.cred)?
         @quic_free(quicsettings)
       else
@@ -57,5 +59,8 @@ class val QUICConfiguration
         @quic_free(quicsettings)
         error
       end
+    fun close() =>
+      @quic_configuration_close(config)
     fun _final() =>
+      @quic_configuration_close(config)
       @quic_free(config)

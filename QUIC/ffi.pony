@@ -129,13 +129,19 @@ use @quic_stream_event_ideal_send_buffer_size_byte_count[U64](event: Pointer[Non
 use @quic_stream_open_stream[Pointer[None] tag](connection: Pointer[None] tag, flag: U32, callback: Pointer[None] tag, ctx: Pointer[None] tag)?
 use @quic_stream_close_stream[None](stream: Pointer[None] tag)
 use @quic_stream_start_stream[None](stream: Pointer[None] tag)?
-use @quic_stream_send[None](stream: Pointer[None] tag, buffer: Pointer[U8] tag, bufferLength: USize)?
+use @quic_stream_send[None](stream: Pointer[None] tag, bufferf: Pointer[U8] tag, bufferLength: USize)?
 use @quic_stream_shutdown[None](stream: Pointer[None] tag, flag: U32)?
 
-use @quic_connection_start[None](connection:Pointer[None] tag, configurgation: Pointer[None] tag, family: U16, target: Pointer[U8] tag, port:U16)?
+use @quic_connection_start[None](connection:Pointer[None] tag, configurgation: Pointer[None] tag, family: I32, target: Pointer[U8] tag, port:U16)?
 use @quic_connection_set_resumption_ticket[None](connection: Pointer[None] tag, ticket: Pointer[U8] tag, ticketLength: U32)?
 use @quic_connection_close[None](connection: Pointer[None] tag)
 use @quic_connection_shutdown[None](connection: Pointer[None] tag)
 use @quic_server_resumption_no_resume[U8]()
 use @quic_server_resumption_resume_only[U8]()
 use @quic_server_resumption_resume_and_zerortt[U8]()
+use @quic_server_listener_start[None](listener: Pointer[None] tag, alpn: Pointer[Pointer[U8] tag] tag, alpnSize: U32, family: I32, ip: Pointer[U8] tag, port: Pointer[U8] tag)?
+use @quic_address_family_unspecified[I32]()
+use @quic_address_family_inet[I32]()
+use @quic_address_family_inet6[I32]()
+use @quic_server_listener_stop[None](listener: Pointer[None] tag)
+use @quic_configuration_close[None](configuration: Pointer[None] tag)

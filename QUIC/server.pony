@@ -1,5 +1,6 @@
 use "collections"
 use "Streams"
+use "Exception"
 
 primitive NoResume
   fun apply(): U8 =>
@@ -18,6 +19,7 @@ actor QUICServer is NotificationEmitter
   let _listener: Pointer[None] tag
   let _connections: Array[QUICConnection]
   let _ctx: Pointer[None] tag
+  var _isClosed: Bool = false
 
   new create(registration: QUICRegistration, configuration: QUICConfiguration val) =>
     _subscribers = Subscribers
@@ -67,6 +69,28 @@ actor QUICServer is NotificationEmitter
     end
     cb(consume connections)
 
+  be listen(port: U16 , ip: String = "0.0.0.0", family: QUICAddressFamily = Unspecified) =>
+    try
+      let alpn: Array[Pointer[U8] tag] = Array[Pointer[U8] tag](_configuration.alpn.size())
+      for app in _configuration.alpn.values() do
+        alpn.push(app.cstring())
+      end
+      @quic_server_listener_start(_listener, alpn.cpointer(), alpn.size().u32(), family(), ip.cstring(), port.string().cstring())?
+      notify(ListenerStartedEvent)
+    else
+      notifyError(Exception("Failed to start server listener"))
+    end
+
+  be stopListening() =>
+    @quic_server_listener_stop(_listener)
+    notify(ListenerStoppedEvent)
+
+  be close() =>
+    _isClosed = true
+    @quic_server_listener_close(_listener)
+    @quic_free(_listener)
+    @quic_free(_ctx)
+
   fun @serverCallback(ctx: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
     if @quic_is_new_connection_event(event) == 1 then
       let quicServer: QUICServer = @quic_server_actor(ctx)
@@ -89,7 +113,10 @@ actor QUICServer is NotificationEmitter
     else
       return 0
     end
+
   fun _final() =>
-    @quic_server_listener_close(_listener)
-    @quic_free(_listener)
-    @quic_free(_ctx)
+    if not _isClosed then
+      @quic_server_listener_close(_listener)
+      @quic_free(_listener)
+      @quic_free(_ctx)
+    end
