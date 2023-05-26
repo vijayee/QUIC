@@ -12,28 +12,41 @@ primitive ResumeAndZeroRTT
   fun apply(): U8 =>
     @quic_server_resumption_resume_and_zerortt()
 
+
+primitive NewQUICServer
+  fun apply(registration: QUICRegistration, configuration: QUICConfiguration val): QUICServer ?  =>
+    let server: QUICServer = QUICServer._create(registration, configuration)
+    let ctx = @quic_new_server_event_context(server, configuration.config)
+    try
+      let listener = @quic_server_listener_open(registration.registration, addressof server.serverCallback, ctx)?
+      server._initialize(ctx, listener)
+    else
+      @quic_free(ctx)
+      error
+    end
+    server
+
 actor QUICServer is NotificationEmitter
   let _subscribers: Subscribers
   let _registration: QUICRegistration
   let _configuration: QUICConfiguration val
-  let _listener: Pointer[None] tag
+  var _listener: Pointer[None] tag
   let _connections: Array[QUICConnection]
-  let _ctx: Pointer[None] tag
-  var _isClosed: Bool = false
+  var _ctx: Pointer[None] tag
+  var _isClosed: Bool = true
 
-  new create(registration: QUICRegistration, configuration: QUICConfiguration val) =>
+  new _create(registration: QUICRegistration, configuration: QUICConfiguration val) =>
     _subscribers = Subscribers
     _connections = Array[QUICConnection](10)
     _configuration = configuration
     _registration = registration
-    _ctx = @quic_new_server_event_context(this, _configuration.config)
-    try
-      _listener = @quic_server_listener_open(_registration.registration, addressof this.serverCallback, _ctx)?
-    else
-      _listener = Pointer[None]
-      // send an error
-      None
-    end
+    _listener = Pointer[None]
+    _ctx = Pointer[None]
+
+  be _initialize(ctx: Pointer[None] tag, listener: Pointer[None] tag) =>
+    _isClosed = false
+    _ctx = ctx
+    _listener = listener
 
   fun ref subscribers(): Subscribers =>
     _subscribers
@@ -90,6 +103,7 @@ actor QUICServer is NotificationEmitter
     @quic_server_listener_close(_listener)
     @quic_free(_listener)
     @quic_free(_ctx)
+    notify(CloseEvent)
 
   fun @serverCallback(ctx: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
     if @quic_is_new_connection_event(event) == 1 then
