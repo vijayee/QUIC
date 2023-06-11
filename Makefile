@@ -9,7 +9,7 @@ build:
 	mkdir -p build/lib
 	mkdir -p build/test
 libponyquic: build
-	clang -v -fPIC -O3 -o build/lib/quic.o -c QUIC/c/quic.c -L$(MSQUICLIBPATH) -I$(PONYINCPATH) -I$(MSINCQUICPATH) -lponyrt -lmsquic #-I$(OPENSSLINCPATH)
+	clang -g -v -fPIC -O3 -o build/lib/quic.o -c QUIC/c/quic.c -L$(MSQUICLIBPATH) -I$(PONYINCPATH) -I$(MSINCQUICPATH) -lponyrt -lmsquic #-I$(OPENSSLINCPATH)
 	#cd build/lib && ar -x  $(MSQUICLIBPATH)/libmsquic.a # && ar -x  $(OPENSSLPATH)/libcrypto.a
 	ar rcs build/lib/libponyquic.a build/lib/*.o
 	rm build/lib/*.o
@@ -24,9 +24,17 @@ test: libponyquic
 	corral run -- ponyc  QUIC/test -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
 	./build/test/test
 
-test/network: libponyquic
+test/network/server: libponyquic
 	#corral fetch
-	corral run -- ponyc  QUIC/test/network -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
-	./build/test/network
+	corral run -- ponyc  QUIC/test/network/server -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
+	./build/test/server
+test/network/client: libponyquic
+	#corral fetch
+	corral run -- ponyc  QUIC/test/network/client -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
+	./build/test/client
+test/network/client/debug: libponyquic
+	#corral fetch
+	corral run -- ponyc  QUIC/test/network/client -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
+	lldb ./build/test/client
 clean:
 	rm -rf build

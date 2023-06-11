@@ -103,7 +103,9 @@ struct quic_server_event_context* quic_new_server_event_context(void* serverActo
 
 struct  quic_connection_event_context {
   void* connectionActor;
+  uint8_t isClient;
   uint8_t QUIC_CONNECTION_EVENT_CONNECTED;
+  unsigned int (*cb) (HQUIC*, void*, QUIC_CONNECTION_EVENT*);
   #if __linux__
     pthread_mutex_t QUIC_CONNECTION_EVENT_CONNECTED_LOCK;
   #endif
@@ -222,7 +224,7 @@ HQUIC* quic_server_configuration(struct quic_server_event_context* ctx);
 
 void* quic_connection_actor(struct quic_connection_event_context* ctx);
 
-struct quic_connection_event_context* quic_new_connection_event_context();
+struct quic_connection_event_context* quic_new_connection_event_context(uint8_t isClient, void* cb);
 void quic_connection_event_context_set_actor(struct quic_connection_event_context* ctx, void* connectionActor);
 
 void quic_free_connection_event_context(struct quic_connection_event_context* ctx);
@@ -331,3 +333,5 @@ int quic_address_family_inet();
 int quic_address_family_inet6();
 void quic_server_listener_stop(HQUIC* listener);
 void quic_configuration_close(HQUIC* configuration);
+uint8_t quic_connection_is_client(struct quic_connection_event_context* ctx);
+void print_pointer(void* ptr);

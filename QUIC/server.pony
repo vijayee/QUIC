@@ -110,7 +110,7 @@ actor QUICServer is NotificationEmitter
       let quicServer: QUICServer = @quic_server_actor(ctx)
       let configuration: Pointer[None] tag = @quic_server_configuration(ctx)
       let conn: Pointer[None] tag = @quic_receive_connection(event)
-      let connectionCtx: Pointer[None] tag = @quic_new_connection_event_context[Pointer[None] tag]()
+      let connectionCtx: Pointer[None] tag = @quic_new_connection_event_context[Pointer[None] tag](0, Pointer[None])
       let connection: QUICConnection = QUICConnection._serverConnection(conn, connectionCtx)
       @quic_connection_event_context_set_actor(connectionCtx, connection)
       let connectionCb = @{(conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>

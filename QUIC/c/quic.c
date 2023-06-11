@@ -2,12 +2,12 @@
 #include <pony.h>
 #include <string.h>
 #include <stdio.h>
-#include <sys/socket.h>
-#include <netdb.h>
 #if _WIN32
   #include <windows.h>
 #else
   #include <pthread.h>
+  #include <sys/socket.h>
+  #include <netdb.h>
 #endif
 #include <msquic.h>
 
@@ -313,7 +313,7 @@ uint8_t quic_is_new_connection_event(QUIC_LISTENER_EVENT* event) {
 HQUIC* quic_server_listner_open(HQUIC* registration, void* serverListenerCallback, struct quic_server_event_context* ctx) {
   HQUIC* listener = malloc(sizeof(HQUIC));
 
-  if (QUIC_FAILED(MSQuic->ListenerOpen(*registration,serverListenerCallback, ctx, listener))) {
+  if (QUIC_FAILED(MSQuic->ListenerOpen(*registration, serverListenerCallback, ctx, listener))) {
     quic_free(listener);
     pony_error();
     return NULL;
@@ -338,9 +338,9 @@ HQUIC* quic_server_listener_open(HQUIC* registration, void* serverListenerCallba
   HQUIC* listener = malloc(sizeof(HQUIC));
 
   if (QUIC_FAILED(MSQuic->ListenerOpen(*registration, serverListenerCallback, ctx, listener))) {
-        pony_error();
-        free(listener);
-        return NULL;
+    pony_error();
+    free(listener);
+    return NULL;
   }
   return listener;
 }
@@ -406,8 +406,11 @@ void quic_stream_get_total_buffer(QUIC_STREAM_EVENT* event, uint8_t* buffer, HQU
   MSQuic->StreamReceiveComplete(*stream, offset);
 }
 
-struct quic_connection_event_context* quic_new_connection_event_context() {
+struct quic_connection_event_context* quic_new_connection_event_context(uint8_t isClient, void * cb) {
   struct quic_connection_event_context* ctx= calloc(1, sizeof(struct quic_connection_event_context));
+  ctx->isClient = isClient;
+  ctx->cb= cb;
+  printf("pointer address in context %p\n", ctx->cb);
   ctx->QUIC_CONNECTION_EVENT_CONNECTED = 1;
   ctx->QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED = 1;
   ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT =1;
@@ -453,11 +456,28 @@ void quic_free_connection_event_context(struct quic_connection_event_context* ct
 void quic_connection_event_context_set_actor(struct quic_connection_event_context* ctx, void* connectionActor) {
     ctx->connectionActor = connectionActor;
 }
+unsigned int testcb(HQUIC* Connection, void* Context, QUIC_CONNECTION_EVENT* Event) {
+  printf("This is the cb happening\n");
+  struct quic_connection_event_context* ctx = (struct quic_connection_event_context*) Context;
+  if (ctx->cb == NULL) {
+    printf("This thang is null\n");
+  }
+  pony_register_thread();
+  printf("pointer address at testcb %p\n", ctx->cb);
+  unsigned int (*cb)(HQUIC*, void*, QUIC_CONNECTION_EVENT*) = ctx->cb;
 
+  return (*cb)(Connection, Context, Event);
+}
+
+void print_pointer(void* ptr) {
+  printf("pointer address printed %p\n", ptr);
+}
 HQUIC* quic_connection_open(HQUIC* registration, void* callback, struct quic_connection_event_context* ctx) {
   HQUIC* connection = malloc(sizeof(HQUIC));
-
-   if (QUIC_FAILED(MSQuic->ConnectionOpen(*registration, callback, ctx, connection))) {
+  unsigned int (*cb)(HQUIC*, void*, QUIC_CONNECTION_EVENT*) = callback;
+  printf("pointer address at open %p\n", callback);
+  //unsigned int i = (*cb)(NULL, NULL, NULL);
+  if (QUIC_FAILED(MSQuic->ConnectionOpen(*registration, testcb, ctx, connection))) {
      pony_error();
      free(connection);
      return NULL;
@@ -810,7 +830,7 @@ uint64_t quic_stream_event_ideal_send_buffer_size_byte_count(QUIC_STREAM_EVENT *
 
 HQUIC* quic_stream_open_stream(HQUIC* connection, QUIC_STREAM_OPEN_FLAGS flag, void* callback, void* ctx) {
   HQUIC* stream = NULL;
-  if (MSQuic->StreamOpen(*connection, flag, callback, ctx, stream)) {
+  if (QUIC_FAILED(MSQuic->StreamOpen(*connection, flag, callback, ctx, stream))) {
     pony_error();
     return NULL;
   };
@@ -822,7 +842,7 @@ void quic_stream_close_stream(HQUIC* stream) {
 }
 
 void quic_stream_start_stream(HQUIC* stream, QUIC_STREAM_START_FLAGS flag) {
-  if (MSQuic->StreamStart(*stream, flag)) {
+  if (QUIC_FAILED(MSQuic->StreamStart(*stream, flag))) {
     pony_error();
   };
 }
@@ -841,7 +861,7 @@ void quic_stream_send(HQUIC* stream, uint8_t* buffer, size_t bufferLength) {
   }
   memcpy(sendBuffer->Buffer, buffer, bufferLength);
   sendBuffer->Length = (uint32_t) bufferLength;
-  if (MSQuic->StreamSend(*stream, sendBuffer, 1, 0, sendBuffer)) {
+  if (QUIC_FAILED(MSQuic->StreamSend(*stream, sendBuffer, 1, 0, sendBuffer))) {
     free(sendBuffer->Buffer);
     free(sendBuffer);
     pony_error();
@@ -849,19 +869,19 @@ void quic_stream_send(HQUIC* stream, uint8_t* buffer, size_t bufferLength) {
 }
 
 void quic_stream_shutdown(HQUIC* stream, QUIC_STREAM_SHUTDOWN_FLAGS flag) {
-  if (MSQuic->StreamShutdown(*stream, flag, 0)) {
+  if (QUIC_FAILED(MSQuic->StreamShutdown(*stream, flag, 0))) {
     pony_error();
   }
 }
 
 void quic_connection_start(HQUIC* connection, HQUIC* configuration, int family, char * target, uint16_t port) {
-  if (MSQuic->ConnectionStart(*connection, *configuration, family, target, port)) {
+  if (QUIC_FAILED(MSQuic->ConnectionStart(*connection, *configuration, family, target, port))) {
     pony_error();
   }
 }
 
 void quic_connection_set_resumption_ticket(HQUIC* connection, uint8_t * ticket, uint32_t ticketLength) {
-  if(MSQuic->SetParam(*connection, QUIC_PARAM_CONN_RESUMPTION_TICKET, ticketLength, ticket)) {
+  if(QUIC_FAILED(MSQuic->SetParam(*connection, QUIC_PARAM_CONN_RESUMPTION_TICKET, ticketLength, ticket))) {
     pony_error();
   };
 }
@@ -934,4 +954,7 @@ void quic_server_listener_stop(HQUIC* listener) {
 
 void quic_configuration_close(HQUIC* configuration) {
   MSQuic->ConfigurationClose(*configuration);
+}
+uint8_t quic_connection_is_client(struct quic_connection_event_context* ctx) {
+  return ctx->isClient;
 }
