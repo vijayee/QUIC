@@ -4,6 +4,8 @@ MSQUICLIBPATH =/home/victor/Workspace/src/github.com/vijayee/msquic/build/bin/Re
 MSQUICINCPATH =/home/victor/Workspace/src/github.com/vijayee/msquic/src/inc
 PONYINCPATH =/home/victor/.local/share/ponyup/ponyc-release-0.51.3-x86_64-linux-gnu/include
 PONYLIBPATH=/home/victor/.local/share/ponyup/ponyc-release-0.51.3-x86_64-linux-gnu/lib/x86-64
+ALTLIBPATH=/home/victor/Workspace/src/github.com/vijayee/ponyc/src/libponyrt/sched
+DEBUGPONYC=/home/victor/Workspace/src/github.com/vijayee/ponyc/build/debug/ponyc
 build:
 	mkdir -p build
 	mkdir -p build/lib
@@ -17,7 +19,7 @@ install: libponyquic
 	mkdir -p /usr/local/lib/NeatCrypto
 	cp build/lib/libponyquic.a /usr/local/lib/QUIC
 testlib:libponyquic
-		clang -v -o build/test/testlib QUIC/test/test.c  #-IQUIC/c -Lbuild/lib -L$(MSQUICLIBPATH) -I$(PONYINCPATH) -I$(MSINCQUICPATH) -lponyrt -lmsquic -lponyquic #-I$(OPENSSLINCPATH)
+		clang -v -o build/test/testlib QUIC/test/test.c -I$(ALTLIBPATH) -lponyrt  #-IQUIC/c -Lbuild/lib -L$(MSQUICLIBPATH) -I$(PONYINCPATH) -I$(MSINCQUICPATH) -lponyrt -lmsquic -lponyquic #-I$(OPENSSLINCPATH)
 		./build/test/testlib
 test: libponyquic
 	#corral fetch
@@ -34,7 +36,7 @@ test/network/client: libponyquic
 	./build/test/client
 test/network/client/debug: libponyquic
 	#corral fetch
-	corral run -- ponyc  QUIC/test/network/client -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
+	corral run -- $(DEBUGPONYC)  QUIC/test/network/client -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
 	lldb ./build/test/client
 clean:
 	rm -rf build

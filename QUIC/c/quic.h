@@ -86,7 +86,7 @@ void quic_server_listener_close(HQUIC* listener);
 HQUIC* quic_receive_connection(QUIC_LISTENER_EVENT* event);
 uint32_t quic_connection_set_configuration(HQUIC* connection, HQUIC* configuration);
 void quic_connection_set_callback(HQUIC* connection, void* connectionCallback, void* ctx);
-uint32_t quic_get_connection_event_type_as_uint(QUIC_LISTENER_EVENT* event);
+int quic_get_connection_event_type_as_uint(QUIC_CONNECTION_EVENT* event);
 void quic_send_resumption_ticket(HQUIC* connection);
 void quic_close_connection(HQUIC* connection);
 HQUIC* quic_receive_stream(QUIC_CONNECTION_EVENT* event);
@@ -254,7 +254,8 @@ struct shutdown_initiated_by_transport_data {
   uint32_t status;
   uint64_t errorCode;
 };
-struct shutdown_initiated_by_transport_data quic_connection_shutdown_initiated_by_transport_data(QUIC_CONNECTION_EVENT* event);
+uint32_t quic_connection_shutdown_initiated_by_transport_data_status(QUIC_CONNECTION_EVENT* event);
+uint64_t quic_connection_shutdown_initiated_by_transport_data_error_code(QUIC_CONNECTION_EVENT* event);
 uint64_t quic_connection_shutdown_initiated_by_peer_data(QUIC_CONNECTION_EVENT* event);
 struct shutdown_complete_data {
   uint8_t handshakeCompleted;
@@ -334,4 +335,3 @@ int quic_address_family_inet6();
 void quic_server_listener_stop(HQUIC* listener);
 void quic_configuration_close(HQUIC* configuration);
 uint8_t quic_connection_is_client(struct quic_connection_event_context* ctx);
-void print_pointer(void* ptr);

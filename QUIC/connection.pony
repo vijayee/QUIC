@@ -1,9 +1,9 @@
 use "Streams"
 use "Exception"
 use "Print"
-
+use "collections"
 primitive _QUICConnectionCallback
-  fun apply (conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
+  fun @apply (conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
     Println("callback")
     let connection: QUICConnection = @quic_connection_actor(context)
     match  @quic_get_connection_event_type_as_uint(event)
@@ -26,10 +26,22 @@ primitive _QUICConnectionCallback
         end
       //QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT
       | 1 =>
+        Println("We in here")
         if @quic_connection_event_enabled(context, event) == 1 then
-          let data': _ShutdownInitiatedByTransportData = @quic_connection_shutdown_initiated_by_transport_data(event)
-          let data: ShutdownInitiatedByTransportData = ShutdownInitiatedByTransportData(data'.status, data'.errorCode)
-          connection._dispatchShutdownInitiatedByTransport(data)
+          Println("Also here")
+          //let status: U32 = @quic_connection_shutdown_initiated_by_transport_data_status(event)
+          //let errorCode: U64 = @quic_connection_shutdown_initiated_by_transport_data_error_code(event)
+          let random: U8 = 2
+          Println("got an int")
+          //Following will cause an error
+          let stupid: Map[String, U64] = Map[String, U64]
+          //let ex = Exception("Failing to create a class")
+
+          //The following also fails and is the needed behavior
+          //let data: ShutdownInitiatedByTransportData = ShutdownInitiatedByTransportData(1, 2)
+          Println("are we here?")
+          //connection._dispatchShutdownInitiatedByTransport(data)
+
         end
       //QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER
       | 2 =>
@@ -40,6 +52,7 @@ primitive _QUICConnectionCallback
       //QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
       | 3 =>
         if @quic_connection_event_enabled(context, event) == 1 then
+          Println("Does this happen")
           var data': _ShutdownCompleteData = _ShutdownCompleteData
           @quic_connection_shutdown_complete_data(event, addressof data')
           let data: ShutdownCompleteData = ShutdownCompleteData(data'.handshakeCompleted, data'.peerAcknowledgedShutdown, data'.appCloseInProgress)
@@ -225,6 +238,7 @@ primitive NewQUICConnection
       let connection = QUICConnection._create(registration, configuration)
 
       let ctx = @quic_new_connection_event_context[Pointer[None] tag](1, addressof _QUICConnectionCallback.apply)
+      @quic_connection_event_context_set_actor(ctx, connection)
       let conn = @quic_connection_open(registration.registration, addressof _QUICConnectionCallback.apply, ctx)?
       match resumptionTicket
         | let resumptionTicket': Array[U8] val =>
@@ -261,6 +275,9 @@ actor QUICConnection is NotificationEmitter
 
   fun ref subscribers() : Subscribers =>
     _subscribers
+
+  be someShit() =>
+    Println("Aint that some shit")
 
   be _initialize(ctx: Pointer[None] tag, connection: Pointer[None] tag) =>
     _invalid = false

@@ -1,4 +1,4 @@
-
+use "Print"
 class val ConnectedData
   let sessionResumed: Bool
   let negotiatedAlpn: Array[U8] val
@@ -6,14 +6,11 @@ class val ConnectedData
     sessionResumed = sessionResumed'
     negotiatedAlpn = negotiatedAlpn'
 
-struct _ShutdownInitiatedByTransportData
-  var status: U32 = 0
-  var errorCode: U64 = 0
-
 class val ShutdownInitiatedByTransportData
   let status: U32
   let errorCode: U64
-  new create(status': U32, errorCode': U64) =>
+  new val create(status': U32, errorCode': U64) =>
+    Println("this should work")
     status = status'
     errorCode = errorCode'
 

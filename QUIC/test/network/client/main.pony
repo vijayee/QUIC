@@ -3,8 +3,7 @@ use "../../.."
 use "Streams"
 use "Exception"
 use "Print"
-use "lib:ponyquic"
-use @print_pointer[None](ptr: Pointer[None])
+
 actor Main
   new create(env: Env) =>
     PonyTest(env, RunClient)
@@ -56,7 +55,7 @@ class iso _TestClient is UnitTest
           let _t: TestHelper = t
           fun ref apply(data: ShutdownCompleteData) =>
             Println("client disconnected")
-             _t.complete_action("client disconnected")
+            _t.complete_action("client disconnected")
         end
         let errorNotify: ErrorNotify iso = object iso is ErrorNotify
           let _t: TestHelper = t
@@ -78,7 +77,6 @@ class iso _TestClient is UnitTest
           client.subscribe(consume onConnected)
           client.subscribe(consume onShutdown)
           client.subscribe(consume closeNotify)
-          @print_pointer(addressof client.connectionCallback)
 
           //client.close()
           Println("All Subscriptions")

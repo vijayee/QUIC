@@ -345,8 +345,63 @@ HQUIC* quic_server_listener_open(HQUIC* registration, void* serverListenerCallba
   return listener;
 }
 
-uint32_t quic_get_connection_event_type_as_uint(QUIC_LISTENER_EVENT* event) {
-  return (uint32_t) event->Type;
+int quic_get_connection_event_type_as_uint(QUIC_CONNECTION_EVENT* event) {
+  pony_register_thread();
+  switch (event->Type) {
+    case QUIC_CONNECTION_EVENT_CONNECTED:
+      printf("QUIC_CONNECTION_EVENT_CONNECTED\n");
+      break;
+    case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
+      printf("QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT\n");
+      break;
+    case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
+      printf("QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER\n");
+      break;
+    case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
+      printf("QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE\n");
+      break;
+    case QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED:
+      printf("QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED\n");
+      break;
+    case QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED:
+      printf("QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED\n");
+      break;
+    case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
+      printf("QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED\n");
+      break;
+    case QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE:
+      printf("QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE\n");
+      break;
+    case QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS:
+      printf("QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE\n");
+      break;
+    case QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED:
+      printf("QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED\n");
+      break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED:
+      printf("QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED\n");
+     break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED:
+      printf("QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED\n");
+      break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED:
+      printf("QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED\n");
+      break;
+    case QUIC_CONNECTION_EVENT_RESUMED:
+      printf("QUIC_CONNECTION_EVENT_RESUMED\n");
+      break;
+    case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
+      printf("QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED\n");
+      break;
+    case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
+      printf("QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED\n");
+      break;
+    default:
+      printf("well wtf\n");
+      break;
+  }
+  printf("size of type %d\n", (int) event->Type);
+  return 1;
 }
 
 void quic_send_resumption_ticket(HQUIC* connection) {
@@ -456,28 +511,16 @@ void quic_free_connection_event_context(struct quic_connection_event_context* ct
 void quic_connection_event_context_set_actor(struct quic_connection_event_context* ctx, void* connectionActor) {
     ctx->connectionActor = connectionActor;
 }
-unsigned int testcb(HQUIC* Connection, void* Context, QUIC_CONNECTION_EVENT* Event) {
-  printf("This is the cb happening\n");
-  struct quic_connection_event_context* ctx = (struct quic_connection_event_context*) Context;
-  if (ctx->cb == NULL) {
-    printf("This thang is null\n");
-  }
+unsigned int connectionCb(HQUIC* Connection, void* Context, QUIC_CONNECTION_EVENT* Event) {
   pony_register_thread();
-  printf("pointer address at testcb %p\n", ctx->cb);
-  unsigned int (*cb)(HQUIC*, void*, QUIC_CONNECTION_EVENT*) = ctx->cb;
-
+  struct quic_connection_event_context* ctx = (struct quic_connection_event_context*) Context;
+  unsigned int (*cb)(void*, void*, void*) = (unsigned int (*)(void *, void *, void *)) ctx->cb;
   return (*cb)(Connection, Context, Event);
 }
 
-void print_pointer(void* ptr) {
-  printf("pointer address printed %p\n", ptr);
-}
 HQUIC* quic_connection_open(HQUIC* registration, void* callback, struct quic_connection_event_context* ctx) {
   HQUIC* connection = malloc(sizeof(HQUIC));
-  unsigned int (*cb)(HQUIC*, void*, QUIC_CONNECTION_EVENT*) = callback;
-  printf("pointer address at open %p\n", callback);
-  //unsigned int i = (*cb)(NULL, NULL, NULL);
-  if (QUIC_FAILED(MSQuic->ConnectionOpen(*registration, testcb, ctx, connection))) {
+  if (QUIC_FAILED(MSQuic->ConnectionOpen(*registration, (QUIC_CONNECTION_CALLBACK_HANDLER) connectionCb, ctx, connection))) {
      pony_error();
      free(connection);
      return NULL;
@@ -697,14 +740,19 @@ uint8_t quic_connection_event_enabled(struct quic_connection_event_context* ctx,
 }
 
 void* quic_connection_actor(struct quic_connection_event_context* ctx) {
+  printf("pointer to ctx %p \n", ctx);
+  printf("pointer to actor %p \n", ctx->connectionActor);
   return ctx->connectionActor;
 }
 
-struct shutdown_initiated_by_transport_data quic_connection_shutdown_initiated_by_transport_data(QUIC_CONNECTION_EVENT* event) {
-  struct shutdown_initiated_by_transport_data data;
-  data.errorCode = (uint64_t) event->SHUTDOWN_INITIATED_BY_TRANSPORT.ErrorCode;
-  data.status = (uint32_t) event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status;
-  return data;
+uint32_t quic_connection_shutdown_initiated_by_transport_data_status(QUIC_CONNECTION_EVENT* event) {
+  printf("The status %u\n", event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
+  return event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status;
+}
+
+uint64_t quic_connection_shutdown_initiated_by_transport_data_error_code(QUIC_CONNECTION_EVENT* event) {
+  printf("The error code %lu\n", event->SHUTDOWN_INITIATED_BY_TRANSPORT.ErrorCode);
+  return event->SHUTDOWN_INITIATED_BY_TRANSPORT.ErrorCode;
 }
 
 uint64_t quic_connection_shutdown_initiated_by_peer_data(QUIC_CONNECTION_EVENT* event) {
