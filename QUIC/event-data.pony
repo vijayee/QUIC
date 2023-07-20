@@ -10,7 +10,6 @@ class val ShutdownInitiatedByTransportData
   let status: U32
   let errorCode: U64
   new val create(status': U32, errorCode': U64) =>
-    Println("this should work")
     status = status'
     errorCode = errorCode'
 

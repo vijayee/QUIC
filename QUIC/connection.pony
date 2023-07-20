@@ -3,194 +3,10 @@ use "Exception"
 use "Print"
 use "collections"
 primitive _QUICConnectionCallback
-  fun @apply (conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
-    Println("callback")
+  fun @apply (context: Pointer[None]) =>
     let connection: QUICConnection = @quic_connection_actor(context)
-    match  @quic_get_connection_event_type_as_uint(event)
-      //QUIC_CONNECTION_EVENT_CONNECTED
-      | 0 =>
-        if @quic_connection_is_client(context) == 0 then
-          @quic_send_resumption_ticket(conn)
-        end
-        if @quic_connection_event_enabled(context, event) == 1 then
-          let sessionResumed: Bool = @quic_connection_connected_event_session_resumed(event) == 1
-          let alpn: Array[U8] iso = recover
-            let alpnLength: USize = @quic_connection_connected_event_session_negotiated_alpn_length(event).usize()
-            let ponyBuffer: Pointer[U8] = @pony_alloc(@pony_ctx(), alpnLength)
-            @quic_connection_connected_event_session_negotiated_alpn_data(event, ponyBuffer)
-            let alpn': Array[U8] = Array[U8].from_cpointer(ponyBuffer, alpnLength)
-            alpn'
-          end
-          let data: ConnectedData = ConnectedData(sessionResumed, consume alpn)
-          connection._dispatchConnected(data)
-        end
-      //QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT
-      | 1 =>
-        Println("We in here")
-        if @quic_connection_event_enabled(context, event) == 1 then
-          Println("Also here")
-          //let status: U32 = @quic_connection_shutdown_initiated_by_transport_data_status(event)
-          //let errorCode: U64 = @quic_connection_shutdown_initiated_by_transport_data_error_code(event)
-          let random: U8 = 2
-          Println("got an int")
-          //Following will cause an error
-          let stupid: Map[String, U64] = Map[String, U64]
-          //let ex = Exception("Failing to create a class")
+    connection._readEventQueue()
 
-          //The following also fails and is the needed behavior
-          //let data: ShutdownInitiatedByTransportData = ShutdownInitiatedByTransportData(1, 2)
-          Println("are we here?")
-          //connection._dispatchShutdownInitiatedByTransport(data)
-
-        end
-      //QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER
-      | 2 =>
-        if @quic_connection_event_enabled(context, event) == 1 then
-          let data: U64 = @quic_connection_shutdown_initiated_by_peer_data(event)
-          connection._dispatchShutdownInitiatedByPeer(data)
-        end
-      //QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
-      | 3 =>
-        if @quic_connection_event_enabled(context, event) == 1 then
-          Println("Does this happen")
-          var data': _ShutdownCompleteData = _ShutdownCompleteData
-          @quic_connection_shutdown_complete_data(event, addressof data')
-          let data: ShutdownCompleteData = ShutdownCompleteData(data'.handshakeCompleted, data'.peerAcknowledgedShutdown, data'.appCloseInProgress)
-          connection._dispatchShutdownComplete(data)
-        end
-        connection._dispatchClose()
-      //QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED
-      | 4 =>
-        if @quic_connection_event_enabled(context, event) == 1 then
-          let data': Pointer[None] tag = @quic_connection_event_local_address_changed_data(event)
-          let data: QUICAddress val = recover val QUICAddress(data') end
-          connection._dispatchLocalAddressChanged(data)
-        end
-      // QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED
-      | 5 =>
-        if @quic_connection_event_enabled(context, event) == 1 then
-          let data': Pointer[None] tag = @quic_connection_event_peer_address_changed_data(event)
-          let data: QUICAddress val = recover val QUICAddress(data') end
-          connection._dispatchPeerAddressChanged(data)
-        end
-      // QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED
-      | 6 =>
-        let strm: Pointer[None] tag = @quic_receive_stream(event)
-        let ctx: Pointer[None] tag = @quic_stream_new_event_context()
-        let stream: QUICStream = match @quic_receive_stream_type(event)
-        | 1 => QUICReadableStream._create(strm, ctx)
-        else
-          QUICDuplexStream._create(strm, ctx)
-        end
-        let streamCallback = @{(strm: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag) =>
-          _QUICStreamCallback(strm, context, event)
-        }
-
-        @quic_stream_event_context_set_actor(ctx, stream)
-        @quic_stream_set_callback(stream, streamCallback, ctx)
-        connection._receiveNewStream(stream)
-       //QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE
-      | 7 =>
-        if @quic_connection_event_enabled(context, event) == 1 then
-          var data': _StreamsAvailableData = _StreamsAvailableData
-          @quic_connection_event_streams_available_data(event, addressof data')
-          let data: StreamsAvailableData = StreamsAvailableData(data'.bidirectionalCount, data'.unidirectionalCount)
-          connection._dispatchStreamsAvailable(data)
-        end
-      //QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS
-      | 8 =>
-        if @quic_connection_event_enabled(context, event) == 1 then
-          let data: Bool = @quic_connection_event_peer_needs_streams_data(event) == 1
-          connection._dispatchPeerNeedsStreams(data)
-        end
-      //QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED
-      | 9 =>
-        if @quic_connection_event_enabled(context, event) == 1 then
-          let data: U16 = @quic_connection_event_ideal_processor_changed_data(event)
-          connection._dispatchIdealProcessorChanged(data)
-        end
-      //QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED
-      | 10 =>
-        if @quic_connection_event_enabled(context, event) == 1 then
-          var data': _DatagramStateChangedData = _DatagramStateChangedData
-          @quic_connection_event_datagram_state_changed_data(event, addressof data')
-          let data: DatagramStateChangedData = DatagramStateChangedData(data'.sendEnabled == 1, data'.maxSendLength.usize())
-          connection._dispatchDatagramStateChanged(data)
-        end
-      //QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED
-      | 11 =>
-        if @quic_connection_event_enabled(context, event) == 1 then
-          let length: USize = @quic_connection_event_datagram_received_buffer_length(event).usize()
-          let data': Array[U8] val = recover
-            let buffer: Pointer[U8] = @pony_alloc(@pony_ctx(), length)
-            Array[U8].from_cpointer(buffer, length)
-          end
-          let flags: Array[QUICReceiveFlags] val = recover
-            let flags': Array[QUICReceiveFlags] = Array[QUICReceiveFlags](2)
-            let flag: U32 = @quic_connection_event_datagram_received_flags(event)
-
-            if flag == 0 then
-              flags'.push(None)
-            else
-              if (flag and ZeroRTT()) == ZeroRTT() then
-                flags'.push(ZeroRTT)
-              end
-              if (flag and FIN()) == FIN() then
-                flags'.push(FIN)
-              end
-            end
-            flags'
-          end
-          let data = DatagramReceivedData(flags, data')
-          connection._dispatchDatagramReceived(data)
-        end
-        //QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED
-      | 12 =>
-        if @quic_connection_event_enabled(context, event) == 1 then
-          let data: QUICDatagramSendState = match @quic_connection_event_datagram_send_state_changed_data(event)
-            | 0 => Unknown
-            | 1 => Sent
-            | 2 => LostSuspect
-            | 3 => LostDiscarded
-            | 4 => Acknowledged
-            | 5 => AcknowledgedSpurious
-            | 6 => Canceled
-            else
-              Unknown
-          end
-          connection._dispatchDatagramSendStateChanged(data)
-        end
-        //QUIC_CONNECTION_EVENT_RESUMED
-      | 13 =>
-        if @quic_connection_event_enabled(context, event) == 1 then
-          let buffer: Array[U8] val = recover
-            let length: USize = @quic_connection_event_resumed_resumption_state_length(event).usize()
-            let buffer': Pointer[U8] = @pony_alloc(@pony_ctx(), length)
-            @quic_connection_event_resumed_resumption_state_buffer(event, buffer')
-            Array[U8].from_cpointer(buffer', length)
-           end
-          let data: ResumedData val = ResumedData(buffer)
-          connection._dispatchResumed(data)
-        end
-        //QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED
-      | 14 =>
-        if @quic_connection_event_enabled(context, event) == 1 then
-          let ticket: Array[U8] val = recover
-            let length: USize = @quic_connection_event_resumption_ticket_received_resumption_ticket_length(event).usize()
-            let buffer: Pointer[U8] = @pony_alloc(@pony_ctx(), length)
-            @quic_connection_event_resumption_ticket_received_resumption_ticket(event, buffer)
-            Array[U8].from_cpointer(buffer, length)
-          end
-          let data: ResumptionTicketReceivedData =  ResumptionTicketReceivedData(ticket)
-          connection._dispatchResumptionTicketReceived(data)
-        end
-        //QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED
-      | 15 =>
-        if @quic_connection_event_enabled(context, event) == 1 then
-          connection._dispatchPeerCertificateReceived()
-        end
-    end
-    0
 
 primitive OpenZeroRTTStream
   fun apply(): U32 =>
@@ -233,23 +49,17 @@ primitive INET6
 type QUICAddressFamily is (Unspecified| INET | INET6)
 
 primitive NewQUICConnection
-  fun apply(registration: QUICRegistration, configuration: QUICConfiguration val, ip: String, port: U16, family: QUICAddressFamily = Unspecified, resumptionTicket: (Array[U8] val | None) = None): QUICConnection ? =>
+  fun apply(registration: QUICRegistration, configuration: QUICConfiguration val): QUICConnection ? =>
+    let ctx = @quic_new_connection_event_context(1, addressof _QUICConnectionCallback.apply)
     try
-      let connection = QUICConnection._create(registration, configuration)
-
-      let ctx = @quic_new_connection_event_context[Pointer[None] tag](1, addressof _QUICConnectionCallback.apply)
+      let connection = QUICConnection._create(configuration)
       @quic_connection_event_context_set_actor(ctx, connection)
       let conn = @quic_connection_open(registration.registration, addressof _QUICConnectionCallback.apply, ctx)?
-      match resumptionTicket
-        | let resumptionTicket': Array[U8] val =>
-          @quic_connection_set_resumption_ticket(conn, resumptionTicket'.cpointer(), resumptionTicket'.size().u32())?
-      end
-      @quic_connection_start(conn, configuration.config, family(), ip.cstring(), port)?
+
       connection._initialize(ctx, conn)
-      Println("This Happened2")
       connection
     else
-      //@quic_free_connection_event_context(ctx)
+      @quic_free_connection_event_context(ctx)
       error
     end
 
@@ -259,8 +69,12 @@ actor QUICConnection is NotificationEmitter
   var _ctx: Pointer[None] tag
   let _subscribers: Subscribers
   var _invalid: Bool = true
+  var _started: Bool = false
+  var _configuration: (QUICConfiguration val | None) = None
 
-  new _create(registration: QUICRegistration, configuration: QUICConfiguration val) =>
+
+  new _create(configuration: QUICConfiguration val) =>
+    _configuration = configuration
     _streams = Array[QUICStream](3)
     _ctx = Pointer[None]
     _subscribers = Subscribers
@@ -276,13 +90,175 @@ actor QUICConnection is NotificationEmitter
   fun ref subscribers() : Subscribers =>
     _subscribers
 
-  be someShit() =>
-    Println("Aint that some shit")
+  be _readEventQueue() =>
+    try
+      let event: Pointer[None] tag = @quic_dequeue_event(_ctx)?
+      match  @quic_get_connection_event_type_as_int(event)
+        //QUIC_CONNECTION_EVENT_CONNECTED
+        | 0 =>
+          let sessionResumed: Bool = @quic_connection_connected_event_session_resumed(event) == 1
+          let alpn: Array[U8] iso = recover
+            let alpnLength: USize = @quic_connection_connected_event_session_negotiated_alpn_length(event).usize()
+            let ponyBuffer: Pointer[U8] = @pony_alloc(@pony_ctx(), alpnLength)
+            @quic_connection_connected_event_session_negotiated_alpn_data(event, ponyBuffer)
+            let alpn': Array[U8] = Array[U8].from_cpointer(ponyBuffer, alpnLength)
+            alpn'
+          end
+          let data: ConnectedData = ConnectedData(sessionResumed, consume alpn)
+          _dispatchConnected(data)
+
+        //QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT
+        | 1 =>
+          let status: U32 = @quic_connection_shutdown_initiated_by_transport_data_status(event)
+          let errorCode: U64 = @quic_connection_shutdown_initiated_by_transport_data_error_code(event)
+          let data: ShutdownInitiatedByTransportData = ShutdownInitiatedByTransportData(status, errorCode)
+          _dispatchShutdownInitiatedByTransport(data)
+          @quic_free(event)
+        //QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER
+        | 2 =>
+          let data: U64 = @quic_connection_shutdown_initiated_by_peer_data(event)
+          _dispatchShutdownInitiatedByPeer(data)
+        //QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+        | 3 =>
+          var data': _ShutdownCompleteData = _ShutdownCompleteData
+          @quic_connection_shutdown_complete_data(event, addressof data')
+          let data: ShutdownCompleteData = ShutdownCompleteData(data'.handshakeCompleted, data'.peerAcknowledgedShutdown, data'.appCloseInProgress)
+          _dispatchShutdownComplete(data)
+          _dispatchClose()
+          @quic_free(event)
+          _close()
+        //QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED
+        | 4 =>
+          let data': Pointer[None] tag = @quic_connection_event_local_address_changed_data(event)
+          let data: QUICAddress val = recover val QUICAddress(data') end
+          _dispatchLocalAddressChanged(data)
+        // QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED
+        | 5 =>
+          let data': Pointer[None] tag = @quic_connection_event_peer_address_changed_data(event)
+          let data: QUICAddress val = recover val QUICAddress(data') end
+          _dispatchPeerAddressChanged(data)
+        // QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED
+        | 6 =>
+          let strm: Pointer[None] tag = @quic_receive_stream(event)
+          let ctx: Pointer[None] tag = @quic_stream_new_event_context()
+          let stream: QUICStream = match @quic_receive_stream_type(event)
+          | 1 => QUICReadableStream._create(strm, ctx)
+          else
+            QUICDuplexStream._create(strm, ctx)
+          end
+          let streamCallback = @{(strm: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag) =>
+            _QUICStreamCallback(strm, context, event)
+          }
+
+          @quic_stream_event_context_set_actor(ctx, stream)
+          @quic_stream_set_callback(stream, streamCallback, ctx)
+          _receiveNewStream(stream)
+         //QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE
+        | 7 =>
+          var data': _StreamsAvailableData = _StreamsAvailableData
+          @quic_connection_event_streams_available_data(event, addressof data')
+          let data: StreamsAvailableData = StreamsAvailableData(data'.bidirectionalCount, data'.unidirectionalCount)
+          _dispatchStreamsAvailable(data)
+        //QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS
+        | 8 =>
+          let data: Bool = @quic_connection_event_peer_needs_streams_data(event) == 1
+          _dispatchPeerNeedsStreams(data)
+        //QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED
+        | 9 =>
+          let data: U16 = @quic_connection_event_ideal_processor_changed_data(event)
+          _dispatchIdealProcessorChanged(data)
+        //QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED
+        | 10 =>
+          var data': _DatagramStateChangedData = _DatagramStateChangedData
+          @quic_connection_event_datagram_state_changed_data(event, addressof data')
+          let data: DatagramStateChangedData = DatagramStateChangedData(data'.sendEnabled == 1, data'.maxSendLength.usize())
+          _dispatchDatagramStateChanged(data)
+        //QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED
+        | 11 =>
+          let length: USize = @quic_connection_event_datagram_received_buffer_length(event).usize()
+          let data': Array[U8] val = recover
+            let buffer: Pointer[U8] = @pony_alloc(@pony_ctx(), length)
+            Array[U8].from_cpointer(buffer, length)
+          end
+          let flags: Array[QUICReceiveFlags] val = recover
+            let flags': Array[QUICReceiveFlags] = Array[QUICReceiveFlags](2)
+            let flag: U32 = @quic_connection_event_datagram_received_flags(event)
+
+            if flag == 0 then
+              flags'.push(None)
+            else
+              if (flag and ZeroRTT()) == ZeroRTT() then
+                flags'.push(ZeroRTT)
+              end
+              if (flag and FIN()) == FIN() then
+                flags'.push(FIN)
+              end
+            end
+            flags'
+          end
+          let data = DatagramReceivedData(flags, data')
+          _dispatchDatagramReceived(data)
+          //QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED
+        | 12 =>
+          let data: QUICDatagramSendState = match @quic_connection_event_datagram_send_state_changed_data(event)
+            | 0 => Unknown
+            | 1 => Sent
+            | 2 => LostSuspect
+            | 3 => LostDiscarded
+            | 4 => Acknowledged
+            | 5 => AcknowledgedSpurious
+            | 6 => Canceled
+            else
+              Unknown
+          end
+          _dispatchDatagramSendStateChanged(data)
+          //QUIC_CONNECTION_EVENT_RESUMED
+        | 13 =>
+          let buffer: Array[U8] val = recover
+            let length: USize = @quic_connection_event_resumed_resumption_state_length(event).usize()
+            let buffer': Pointer[U8] = @pony_alloc(@pony_ctx(), length)
+            @quic_connection_event_resumed_resumption_state_buffer(event, buffer')
+            Array[U8].from_cpointer(buffer', length)
+           end
+          let data: ResumedData val = ResumedData(buffer)
+          _dispatchResumed(data)
+          //QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED
+        | 14 =>
+          let ticket: Array[U8] val = recover
+            let length: USize = @quic_connection_event_resumption_ticket_received_resumption_ticket_length(event).usize()
+            let buffer: Pointer[U8] = @pony_alloc(@pony_ctx(), length)
+            @quic_connection_event_resumption_ticket_received_resumption_ticket(event, buffer)
+            Array[U8].from_cpointer(buffer, length)
+          end
+          let data: ResumptionTicketReceivedData =  ResumptionTicketReceivedData(ticket)
+          _dispatchResumptionTicketReceived(data)
+          //QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED
+        | 15 =>
+          _dispatchPeerCertificateReceived()
+      end
+    else
+      Println("queue is empty")
+    end
 
   be _initialize(ctx: Pointer[None] tag, connection: Pointer[None] tag) =>
     _invalid = false
     _ctx = ctx
     _connection = connection
+
+  be start( ip: String, port: U16, family: QUICAddressFamily = Unspecified, resumptionTicket: (Array[U8] val | None) = None) =>
+    if not _started then
+      try
+        match resumptionTicket
+          | let resumptionTicket': Array[U8] val =>
+            @quic_connection_set_resumption_ticket(_connection, resumptionTicket'.cpointer(), resumptionTicket'.size().u32())?
+        end
+        @quic_connection_start(_connection, (_configuration as QUICConfiguration).config, family(), ip.cstring(), port)?
+        _started = true
+      else
+        notifyError(Exception("Failed to start connection"))
+      end
+      _started = true
+    end
 
   be openStream[S: (QUICDuplexStream tag | QUICWriteableStream tag) = QUICDuplexStream](cb: {((S | Exception))} val, flag: (QUICStreamOpenFlags | None) = None) =>
     if _invalid then
@@ -328,7 +304,7 @@ actor QUICConnection is NotificationEmitter
       @quic_free(ctx)
     end
 
-  be _receiveNewStream(stream: QUICStream) =>
+  fun ref _receiveNewStream(stream: QUICStream) =>
     _streams.push(stream)
     let onclose: CloseNotify iso= object iso is CloseNotify
       let _connection: QUICConnection = this
@@ -359,11 +335,6 @@ actor QUICConnection is NotificationEmitter
       streams.push(strm)
     end
     cb(consume streams)
-
-  fun @connectionCallback(conn: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
-    Println("callback calledt then is oom")
-    //_QUICConnectionCallback(conn, context, event)
-    0
 
   fun ref subscribeInternal(notify': Notify iso, once: Bool = false) =>
     let subscribers': Subscribers = subscribers()
@@ -447,56 +418,62 @@ actor QUICConnection is NotificationEmitter
     fun ref _dispatchPeerStreamStarted(data: QUICStream) =>
         notifyPayload[QUICStream](PeerStreamStartedEvent, data)
 
-    be _dispatchConnected(data: ConnectedData val) =>
+    fun ref _dispatchConnected(data: ConnectedData val) =>
       notifyPayload[ConnectedData](ConnectedEvent, data)
 
-    be _dispatchShutdownInitiatedByTransport(data: ShutdownInitiatedByTransportData val) =>
+    fun ref _dispatchShutdownInitiatedByTransport(data: ShutdownInitiatedByTransportData val) =>
+      Println("Notify called")
       notifyPayload[ShutdownInitiatedByTransportData val](ShutdownInitiatedByTransportEvent, data)
 
-    be _dispatchShutdownInitiatedByPeer(data: U64) =>
+    fun ref _dispatchShutdownInitiatedByPeer(data: U64) =>
       notifyPayload[U64](ShutdownInitiatedByPeerEvent, data)
 
-    be _dispatchShutdownComplete(data: ShutdownCompleteData val) =>
+    fun ref _dispatchShutdownComplete(data: ShutdownCompleteData val) =>
+      Println("Shutdown Complete notified")
       notifyPayload[ShutdownCompleteData val](ShutdownCompleteEvent, data)
 
-    be _dispatchLocalAddressChanged(data: QUICAddress val) =>
+    fun ref _dispatchLocalAddressChanged(data: QUICAddress val) =>
       notifyPayload[QUICAddress val](LocalAddressChangedEvent, data)
 
-    be _dispatchPeerAddressChanged(data: QUICAddress val) =>
+    fun ref _dispatchPeerAddressChanged(data: QUICAddress val) =>
       notifyPayload[QUICAddress val](PeerAddressChangedEvent, data)
 
-    be _dispatchStreamsAvailable(data: StreamsAvailableData val) =>
+    fun ref _dispatchStreamsAvailable(data: StreamsAvailableData val) =>
       notifyPayload[StreamsAvailableData val](StreamsAvailableEvent, data)
 
-    be _dispatchPeerNeedsStreams(data: Bool) =>
+    fun ref _dispatchPeerNeedsStreams(data: Bool) =>
       notifyPayload[Bool](PeerNeedsStreamsEvent, data)
 
-    be _dispatchDatagramStateChanged(data: DatagramStateChangedData val) =>
+    fun ref _dispatchDatagramStateChanged(data: DatagramStateChangedData val) =>
       notifyPayload[DatagramStateChangedData val](DatagramStateChangedEvent, data)
 
-    be _dispatchDatagramReceived(data: DatagramReceivedData val) =>
+    fun ref _dispatchDatagramReceived(data: DatagramReceivedData val) =>
       notifyPayload[DatagramReceivedData val](DatagramReceivedEvent, data)
 
-    be _dispatchDatagramSendStateChanged(data: QUICDatagramSendState) =>
+    fun ref _dispatchDatagramSendStateChanged(data: QUICDatagramSendState) =>
       notifyPayload[QUICDatagramSendState](DatagramSendStateChangedEvent, data)
 
-    be _dispatchResumed(data: ResumedData val) =>
+    fun ref _dispatchResumed(data: ResumedData val) =>
       notifyPayload[ResumedData val](ResumedEvent, data)
 
-    be _dispatchResumptionTicketReceived(data: ResumptionTicketReceivedData val) =>
+    fun ref _dispatchResumptionTicketReceived(data: ResumptionTicketReceivedData val) =>
        notifyPayload[ResumptionTicketReceivedData val](ResumptionTicketReceivedEvent, data)
 
-    be _dispatchPeerCertificateReceived() =>
+    fun ref _dispatchPeerCertificateReceived() =>
        notify(PeerCertificateReceivedEvent)
 
-    be _dispatchIdealProcessorChanged(data: U16) =>
+    fun ref _dispatchIdealProcessorChanged(data: U16) =>
       notifyPayload[U16](IdealProcessorChangedEvent, data)
 
-    be _dispatchClose() =>
+    fun ref _dispatchClose() =>
       notify(CloseEvent)
-    be close() => None
+
+    fun _close() =>
       @quic_connection_shutdown(_connection)
-    fun _final() =>
-      Println("connection is being destroyed")
       @quic_connection_close(_connection)
+
+    be close() => None
+      _close()
+    fun _final() =>
+      _close()
       @quic_free_connection_event_context(_ctx)

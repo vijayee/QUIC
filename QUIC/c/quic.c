@@ -310,7 +310,7 @@ uint8_t quic_is_new_connection_event(QUIC_LISTENER_EVENT* event) {
   }
 }
 
-HQUIC* quic_server_listner_open(HQUIC* registration, void* serverListenerCallback, struct quic_server_event_context* ctx) {
+HQUIC* quic_server_listner_open(HQUIC* registration, void* serverListenerCallback, quic_server_event_context* ctx) {
   HQUIC* listener = malloc(sizeof(HQUIC));
 
   if (QUIC_FAILED(MSQuic->ListenerOpen(*registration, serverListenerCallback, ctx, listener))) {
@@ -334,7 +334,7 @@ uint32_t quic_connection_set_configuration(HQUIC* connection, HQUIC* configurati
   return (uint32_t) MSQuic->ConnectionSetConfiguration(*connection, *configuration);
 }
 
-HQUIC* quic_server_listener_open(HQUIC* registration, void* serverListenerCallback, struct quic_server_event_context* ctx) {
+HQUIC* quic_server_listener_open(HQUIC* registration, void* serverListenerCallback, quic_server_event_context* ctx) {
   HQUIC* listener = malloc(sizeof(HQUIC));
 
   if (QUIC_FAILED(MSQuic->ListenerOpen(*registration, serverListenerCallback, ctx, listener))) {
@@ -345,7 +345,7 @@ HQUIC* quic_server_listener_open(HQUIC* registration, void* serverListenerCallba
   return listener;
 }
 
-int quic_get_connection_event_type_as_uint(QUIC_CONNECTION_EVENT* event) {
+int quic_get_connection_event_type_as_int(QUIC_CONNECTION_EVENT* event) {
   pony_register_thread();
   switch (event->Type) {
     case QUIC_CONNECTION_EVENT_CONNECTED:
@@ -400,8 +400,7 @@ int quic_get_connection_event_type_as_uint(QUIC_CONNECTION_EVENT* event) {
       printf("well wtf\n");
       break;
   }
-  printf("size of type %d\n", (int) event->Type);
-  return 1;
+  return (int) event->Type;
 }
 
 void quic_send_resumption_ticket(HQUIC* connection) {
@@ -461,14 +460,15 @@ void quic_stream_get_total_buffer(QUIC_STREAM_EVENT* event, uint8_t* buffer, HQU
   MSQuic->StreamReceiveComplete(*stream, offset);
 }
 
-struct quic_connection_event_context* quic_new_connection_event_context(uint8_t isClient, void * cb) {
-  struct quic_connection_event_context* ctx= calloc(1, sizeof(struct quic_connection_event_context));
+quic_connection_event_context* quic_new_connection_event_context(uint8_t isClient, void * cb) {
+  quic_connection_event_context* ctx= calloc(1, sizeof(quic_connection_event_context));
   ctx->isClient = isClient;
   ctx->cb= cb;
-  printf("pointer address in context %p\n", ctx->cb);
   ctx->QUIC_CONNECTION_EVENT_CONNECTED = 1;
   ctx->QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED = 1;
   ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT =1;
+  ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER = 1;
+  ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE= 1;
   platform_lock_init(ctx->QUIC_CONNECTION_EVENT_CONNECTED_LOCK);
   platform_lock_init(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT_LOCK);
   platform_lock_init(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER_LOCK);
@@ -488,7 +488,7 @@ struct quic_connection_event_context* quic_new_connection_event_context(uint8_t 
   return ctx;
 }
 
-void quic_free_connection_event_context(struct quic_connection_event_context* ctx) {
+void quic_free_connection_event_context(quic_connection_event_context* ctx) {
   platform_lock_destroy(ctx->QUIC_CONNECTION_EVENT_CONNECTED_LOCK);
   platform_lock_destroy(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT_LOCK);
   platform_lock_destroy(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER_LOCK);
@@ -508,17 +508,143 @@ void quic_free_connection_event_context(struct quic_connection_event_context* ct
   free(ctx);
 }
 
-void quic_connection_event_context_set_actor(struct quic_connection_event_context* ctx, void* connectionActor) {
+void quic_connection_event_context_set_actor(quic_connection_event_context* ctx, void* connectionActor) {
     ctx->connectionActor = connectionActor;
 }
-unsigned int connectionCb(HQUIC* Connection, void* Context, QUIC_CONNECTION_EVENT* Event) {
-  pony_register_thread();
-  struct quic_connection_event_context* ctx = (struct quic_connection_event_context*) Context;
-  unsigned int (*cb)(void*, void*, void*) = (unsigned int (*)(void *, void *, void *)) ctx->cb;
-  return (*cb)(Connection, Context, Event);
+
+void quic_enqueue_event(quic_event_queue* queue, void* event, quic_event_type type) {
+  platform_lock(queue->lock);
+  quic_event_queue_node* node = NULL;
+  if (queue->next == NULL) {
+    node = malloc(sizeof(quic_event_queue_node));
+    node->type = type;
+    node->event = event;
+    node->next = NULL;
+    queue->next = node;
+    queue->length = 1;
+  } else {
+    node = queue->next;
+    while (node->next!= NULL) {
+      node = node->next;
+    }
+    node->next = malloc(sizeof(quic_event_queue_node));
+    node= node->next;
+    node->type = type;
+    node->next = NULL;
+    node->event = event;
+    queue->length++;
+  }
+  platform_unlock(queue->lock);
 }
 
-HQUIC* quic_connection_open(HQUIC* registration, void* callback, struct quic_connection_event_context* ctx) {
+void* quic_dequeue_event(void* context) {
+  quic_connection_event_context* ctx = (quic_connection_event_context*) context;
+  quic_event_queue* queue = &ctx->events;
+  platform_lock(queue->lock);
+  quic_event_queue_node* node= NULL;
+  if (queue->next == NULL) {
+    pony_error();
+    return node;
+  } else {
+    node = queue->next;
+    queue->next = node->next;
+    if (queue->length > 0) {
+      queue->length--;
+    }
+  }
+  void* event = node->event;
+  node->event = NULL;
+  free(node);
+  platform_unlock(queue->lock);
+  return event;
+}
+unsigned int connectionCb(HQUIC* connection, void* context, QUIC_CONNECTION_EVENT* event) {
+  pony_register_thread();
+  quic_connection_event_context* ctx = (quic_connection_event_context*) context;
+  if (!quic_connection_event_enabled(context, event)) {
+    return 0;
+  }
+
+  QUIC_CONNECTION_EVENT * evt = calloc(1, sizeof(event));
+  evt->Type = event->Type;
+  switch(event->Type) {
+    case QUIC_CONNECTION_EVENT_CONNECTED:
+      if (quic_connection_is_client(ctx)) {
+        quic_send_resumption_ticket(connection);
+      }
+      evt->CONNECTED.SessionResumed = event->CONNECTED.SessionResumed;
+      evt->CONNECTED.NegotiatedAlpnLength = event->CONNECTED.NegotiatedAlpnLength;
+      evt->CONNECTED.NegotiatedAlpn = malloc((size_t)evt->CONNECTED.NegotiatedAlpnLength);
+      memcpy((void*)evt->CONNECTED.NegotiatedAlpn, event->CONNECTED.NegotiatedAlpn, (size_t)event->CONNECTED.NegotiatedAlpnLength);
+      break;
+    case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
+      evt->SHUTDOWN_INITIATED_BY_TRANSPORT.Status = event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status;
+      evt->SHUTDOWN_INITIATED_BY_TRANSPORT.ErrorCode = event->SHUTDOWN_INITIATED_BY_TRANSPORT.ErrorCode;
+      break;
+    case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
+      evt->SHUTDOWN_INITIATED_BY_PEER.ErrorCode = evt->SHUTDOWN_INITIATED_BY_PEER.ErrorCode;
+      break;
+    case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
+      evt->SHUTDOWN_COMPLETE.HandshakeCompleted = event->SHUTDOWN_COMPLETE.HandshakeCompleted;
+      evt->SHUTDOWN_COMPLETE.PeerAcknowledgedShutdown = event->SHUTDOWN_COMPLETE.PeerAcknowledgedShutdown;
+      evt->SHUTDOWN_COMPLETE.AppCloseInProgress = event->SHUTDOWN_COMPLETE.AppCloseInProgress;
+      break;
+    case QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED:
+      evt->LOCAL_ADDRESS_CHANGED.Address= malloc(sizeof(QUIC_ADDR));
+      memcpy((void*)evt->LOCAL_ADDRESS_CHANGED.Address, event->LOCAL_ADDRESS_CHANGED.Address, sizeof(QUIC_ADDR));
+      break;
+    case QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED:
+      evt->PEER_ADDRESS_CHANGED.Address= malloc(sizeof(QUIC_ADDR));
+      memcpy((void*)evt->PEER_ADDRESS_CHANGED.Address, event->PEER_ADDRESS_CHANGED.Address, sizeof(QUIC_ADDR));
+      break;
+    case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
+      evt->PEER_STREAM_STARTED.Stream = event->PEER_STREAM_STARTED.Stream;
+      evt->PEER_STREAM_STARTED.Flags = event->PEER_STREAM_STARTED.Flags;
+      break;
+    case QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE:
+      evt->STREAMS_AVAILABLE.BidirectionalCount = event->STREAMS_AVAILABLE.BidirectionalCount;
+      evt->STREAMS_AVAILABLE.UnidirectionalCount = event->STREAMS_AVAILABLE.UnidirectionalCount;
+      break;
+    case QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS:
+      evt->PEER_NEEDS_STREAMS.Bidirectional = event-> PEER_NEEDS_STREAMS.Bidirectional;
+      break;
+    case QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED:
+      evt->IDEAL_PROCESSOR_CHANGED.IdealProcessor = event->IDEAL_PROCESSOR_CHANGED.IdealProcessor;
+      break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED:
+      evt->DATAGRAM_STATE_CHANGED.SendEnabled = event->DATAGRAM_STATE_CHANGED.SendEnabled;
+      evt->DATAGRAM_STATE_CHANGED.MaxSendLength = event->DATAGRAM_STATE_CHANGED.MaxSendLength;
+      break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED:
+      evt->DATAGRAM_RECEIVED.Buffer = malloc(sizeof(QUIC_BUFFER));
+      evt->DATAGRAM_RECEIVED.Flags = event->DATAGRAM_RECEIVED.Flags;
+      memcpy((void*)evt->DATAGRAM_RECEIVED.Buffer, (void *)&event->DATAGRAM_RECEIVED.Buffer, sizeof(event->DATAGRAM_RECEIVED.Buffer)) ;
+      memcpy((void*)evt->DATAGRAM_RECEIVED.Buffer->Buffer, event->DATAGRAM_RECEIVED.Buffer->Buffer, (size_t) event->DATAGRAM_RECEIVED.Buffer->Length);
+      break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED:
+      evt->DATAGRAM_SEND_STATE_CHANGED.ClientContext = event->DATAGRAM_SEND_STATE_CHANGED.ClientContext;
+      evt->DATAGRAM_SEND_STATE_CHANGED.State = event->DATAGRAM_SEND_STATE_CHANGED.State;
+      break;
+    case QUIC_CONNECTION_EVENT_RESUMED:
+      evt->RESUMED.ResumptionStateLength = event->RESUMED.ResumptionStateLength;
+      evt->RESUMED.ResumptionState = malloc((size_t) evt->RESUMED.ResumptionStateLength);
+      memcpy((void*)evt->RESUMED.ResumptionState, event->RESUMED.ResumptionState, (size_t) evt->RESUMED.ResumptionStateLength);
+      break;
+    case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
+      evt->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength = event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength;
+      evt->RESUMPTION_TICKET_RECEIVED.ResumptionTicket = malloc((size_t) evt->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
+      memcpy((void*)evt->RESUMPTION_TICKET_RECEIVED.ResumptionTicket, event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket, (size_t) evt->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
+      break;
+    case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
+      break;
+  }
+  quic_enqueue_event(&ctx->events, evt, QUIC_CONNECTION_EVENTS);
+  void (*cb)(void*) = (void (*)(void*)) ctx->cb;
+  (*cb)(ctx);
+  return 0;
+}
+
+HQUIC* quic_connection_open(HQUIC* registration, void* callback, quic_connection_event_context* ctx) {
   HQUIC* connection = malloc(sizeof(HQUIC));
   if (QUIC_FAILED(MSQuic->ConnectionOpen(*registration, (QUIC_CONNECTION_CALLBACK_HANDLER) connectionCb, ctx, connection))) {
      pony_error();
@@ -528,112 +654,112 @@ HQUIC* quic_connection_open(HQUIC* registration, void* callback, struct quic_con
    return connection;
 }
 
-struct quic_server_event_context* quic_new_server_event_context(void* serverActor, HQUIC* configuration) {
-  struct quic_server_event_context* ctx = malloc(sizeof(struct quic_server_event_context));
+quic_server_event_context* quic_new_server_event_context(void* serverActor, HQUIC* configuration) {
+  quic_server_event_context* ctx = malloc(sizeof(quic_server_event_context));
   ctx->serverActor = serverActor;
   ctx->configuration = configuration;
   return ctx;
 }
 
-void* quic_server_actor(struct quic_server_event_context* ctx) {
+void* quic_server_actor(quic_server_event_context* ctx) {
   return ctx->serverActor;
 }
 
-HQUIC* quic_server_configuration(struct quic_server_event_context* ctx) {
+HQUIC* quic_server_configuration(quic_server_event_context* ctx) {
   return ctx->configuration;
 }
 
-void quic_connection_set_connected_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_connected_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_CONNECTED_LOCK);
   ctx->QUIC_CONNECTION_EVENT_CONNECTED = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_CONNECTED_LOCK);
 }
 
-void quic_connection_set_shutdown_initiated_by_transport_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_shutdown_initiated_by_transport_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT_LOCK);
   ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT_LOCK);
 }
 
-void quic_connection_set_shutdown_initiated_by_peer_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_shutdown_initiated_by_peer_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER_LOCK);
   ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER_LOCK);
 }
 
-void quic_connection_set_shutdown_complete_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_shutdown_complete_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE_LOCK);
   ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE_LOCK);
 }
 
-void quic_connection_set_local_address_changed_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_local_address_changed_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED_LOCK);
   ctx->QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED_LOCK);
 }
 
-void quic_connection_set_peer_address_changed_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_peer_address_changed_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED_LOCK);
   ctx->QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED_LOCK);
 }
 
-void quic_connection_set_peer_stream_started_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_peer_stream_started_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx-> QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED_LOCK);
   ctx-> QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED_LOCK);
 }
 
-void quic_connection_set_streams_available_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_streams_available_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE_LOCK);
   ctx->QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE_LOCK);
 }
 
-void quic_connection_set_peer_needs_streams_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_peer_needs_streams_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS_LOCK);
   ctx->QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS_LOCK);
 }
 
-void quic_connection_set_ideal_processor_changed_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_ideal_processor_changed_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED_LOCK);
   ctx->QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED_LOCK);
 }
 
-void quic_connection_set_datagram_state_changed_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_datagram_state_changed_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED_LOCK);
   ctx->QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED_LOCK);
 }
 
-void quic_connection_set_datagram_received_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_datagram_received_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED_LOCK);
   ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED_LOCK);
 }
 
-void quic_connection_set_datagram_send_state_changed_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_datagram_send_state_changed_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED_LOCK);
   ctx->QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED_LOCK);
 }
 
-void quic_connection_set_resumed_changed_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_resumed_changed_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_RESUMED_LOCK);
   ctx->QUIC_CONNECTION_EVENT_RESUMED = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_RESUMED_LOCK);
 }
 
-void quic_connection_set_datagram_resumption_ticket_received_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_datagram_resumption_ticket_received_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED_LOCK);
   ctx->QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED_LOCK);
 }
 
-void quic_connection_set_datagram_peer_certificate_received_event(struct quic_connection_event_context* ctx, uint8_t value) {
+void quic_connection_set_datagram_peer_certificate_received_event(quic_connection_event_context* ctx, uint8_t value) {
   platform_lock(ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED_LOCK);
   ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED = value;
   platform_unlock(ctx->QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED_LOCK);
@@ -651,7 +777,7 @@ void quic_connection_connected_event_session_negotiated_alpn_data(QUIC_CONNECTIO
   memcpy(buffer, event->CONNECTED.NegotiatedAlpn, (size_t)event->CONNECTED.NegotiatedAlpnLength);
 }
 
-uint8_t quic_connection_event_enabled(struct quic_connection_event_context* ctx, QUIC_CONNECTION_EVENT* event) {
+uint8_t quic_connection_event_enabled(quic_connection_event_context* ctx, QUIC_CONNECTION_EVENT* event) {
   uint8_t value = 0;
   switch (event->Type) {
     case QUIC_CONNECTION_EVENT_CONNECTED :
@@ -739,19 +865,15 @@ uint8_t quic_connection_event_enabled(struct quic_connection_event_context* ctx,
   return value;
 }
 
-void* quic_connection_actor(struct quic_connection_event_context* ctx) {
-  printf("pointer to ctx %p \n", ctx);
-  printf("pointer to actor %p \n", ctx->connectionActor);
+void* quic_connection_actor(quic_connection_event_context* ctx) {
   return ctx->connectionActor;
 }
 
 uint32_t quic_connection_shutdown_initiated_by_transport_data_status(QUIC_CONNECTION_EVENT* event) {
-  printf("The status %u\n", event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
   return event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status;
 }
 
 uint64_t quic_connection_shutdown_initiated_by_transport_data_error_code(QUIC_CONNECTION_EVENT* event) {
-  printf("The error code %lu\n", event->SHUTDOWN_INITIATED_BY_TRANSPORT.ErrorCode);
   return event->SHUTDOWN_INITIATED_BY_TRANSPORT.ErrorCode;
 }
 
@@ -824,16 +946,16 @@ void quic_connection_event_resumption_ticket_received_resumption_ticket(QUIC_CON
   memcpy(buffer, event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket, (size_t) event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
 }
 
-struct quic_stream_event_context * quic_stream_new_event_context() {
-  struct quic_stream_event_context * ctx = calloc(1, sizeof(struct quic_stream_event_context));
+quic_stream_event_context * quic_stream_new_event_context() {
+  quic_stream_event_context * ctx = calloc(1, sizeof(quic_stream_event_context));
   return ctx;
 }
 
-void quic_stream_event_context_set_actor(struct quic_stream_event_context* ctx, void* streamActor) {
+void quic_stream_event_context_set_actor(quic_stream_event_context* ctx, void* streamActor) {
   ctx->streamActor = streamActor;
 }
 
-void* quic_stream_actor(struct quic_stream_event_context* ctx) {
+void* quic_stream_actor(quic_stream_event_context* ctx) {
   return ctx->streamActor;
 }
 
@@ -1003,6 +1125,6 @@ void quic_server_listener_stop(HQUIC* listener) {
 void quic_configuration_close(HQUIC* configuration) {
   MSQuic->ConfigurationClose(*configuration);
 }
-uint8_t quic_connection_is_client(struct quic_connection_event_context* ctx) {
+uint8_t quic_connection_is_client(quic_connection_event_context* ctx) {
   return ctx->isClient;
 }

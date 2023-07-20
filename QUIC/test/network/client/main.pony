@@ -68,15 +68,17 @@ class iso _TestClient is UnitTest
           let _configuration: QUICConfiguration = configuration
           fun ref apply() =>
             Println("closed")
+            _t.complete(true)
             _configuration.close()
         end
         try
-          let client = NewQUICConnection(registration, configuration, "127.0.0.1", 9090)?
+          let client = NewQUICConnection(registration, configuration)?
           custodian(client)
           client.subscribe(consume errorNotify)
           client.subscribe(consume onConnected)
           client.subscribe(consume onShutdown)
           client.subscribe(consume closeNotify)
+          client.start ("127.0.0.1", 9090)
 
           //client.close()
           Println("All Subscriptions")

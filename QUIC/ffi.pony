@@ -44,7 +44,7 @@ use @quic_certificate_pkcs12[Pointer[None]](Asn1Blob: Pointer[U8] tag, Asn1BlobL
 use @quic_new_credential_config[Pointer[None] tag](credType: I32, flags: U64, cert: Pointer[None] tag, allowedCiphers: U8, caCertificateFile: Pointer[U8] tag)
 
 use @quic_connection_actor[QUICConnection](ctx: Pointer[None] tag)
-use @quic_get_connection_event_type_as_uint[I32](event: Pointer[None] tag)
+use @quic_get_connection_event_type_as_int[I32](event: Pointer[None] tag)
 use @quic_receive_stream[Pointer[None] tag](event: Pointer[None] tag)
 use @quic_receive_stream_type[U32](event: Pointer[None] tag)
 use @quic_stream_set_callback[None](stream: QUICStream, streamCallback: Pointer[None] tag, ctx: Pointer[None] tag)
@@ -147,4 +147,4 @@ use @quic_address_family_inet6[I32]()
 use @quic_server_listener_stop[None](listener: Pointer[None] tag)
 use @quic_configuration_close[None](configuration: Pointer[None] tag)
 use @quic_connection_is_client[U8](ctx: Pointer[None] tag)
-use @quic_register_thread[None]()
+use @quic_dequeue_event[Pointer[None] tag](ctx: Pointer[None] tag)?
