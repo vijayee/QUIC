@@ -19,6 +19,7 @@ actor QUICCustodian
      Println("custodian culled")
    be apply(ward':  (QUICConnection | None)) =>
      ward = ward'
+     
 class iso _TestClient is UnitTest
   let custodian: QUICCustodian
   fun name(): String => "Testing Client Creation"
@@ -81,7 +82,6 @@ class iso _TestClient is UnitTest
           client.start ("127.0.0.1", 9090)
 
           //client.close()
-          Println("All Subscriptions")
         else
           t.fail("Client Creation Error")
           configuration.close()

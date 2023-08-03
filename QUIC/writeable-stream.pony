@@ -4,7 +4,7 @@ use "Exception"
 actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
   var _isDestroyed: Bool = false
   let _subscribers': Subscribers
-  let _ctx: Pointer[None] tag
+  var _ctx: Pointer[None] tag
   let _stream: Pointer[None] tag
 
   new _create(stream: Pointer[None] tag, ctx: Pointer[None] tag) =>
@@ -21,6 +21,63 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
   fun _final() =>
     @quic_free(_ctx)
     @quic_stream_close_stream(_stream)
+
+  be _readEventQueue() =>
+    try
+      let event: Pointer[None] tag = @quic_dequeue_event(_ctx)?
+      match @quic_get_stream_event_type_as_int(event)
+        //QUIC_STREAM_EVENT_START_COMPLETE
+        | 0 =>
+          var data': _StreamStartCompleteData = @quic_stream_start_complete_data(event)
+          var data: StreamStartCompleteData = StreamStartCompleteData(data'.status,
+            data'.id,
+            data'.peerAccepted == 1)
+          _dispatchStreamStartComplete(data)
+        //QUIC_STREAM_EVENT_RECEIVE
+        | 1 =>
+            _receive(event)
+        //QUIC_STREAM_EVENT_SEND_COMPLETE
+        | 2 =>
+          let data: SendCompleteData = SendCompleteData(@quic_stream_event_send_shutdown_complete_graceful(event) == 1)
+          _dispatchSendComplete(data)
+        //QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN
+        | 3 =>
+          _dispatchPeerSendShutdown()
+        //QUIC_STREAM_EVENT_PEER_SEND_ABORTED
+        | 4 =>
+          let data: PeerSendAbortedData = PeerSendAbortedData(@quic_stream_event_peer_send_aborted_error_code(event))
+          _dispatchPeerSendAborted(data)
+        //QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED
+        | 5 =>
+          let data: PeerReceiveAbortedData = PeerReceiveAbortedData(@quic_stream_event_peer_receive_aborted_error_code(event))
+          _dispatchPeerReceiveAborted(data)
+        //QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
+        | 6 =>
+          let data: SendShutdownCompleteData = SendShutdownCompleteData(@quic_stream_event_send_shutdown_complete_graceful(event) == 1)
+          _dispatchSendShutdownComplete(data)
+        //QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE
+        | 7 =>
+          let data': _StreamShutdownCompleteData= @quic_stream_shutdown_complete_data(event)
+          let data: StreamShutdownCompleteData = StreamShutdownCompleteData(data'.connectionShutdown == 1,
+            data'.appCloseInProgress == 1,
+            data'.connectionShutdownByApp == 1,
+            data'.connectionClosedRemotely == 1,
+            data'.connectionErrorCode,
+            data'.connectionCloseStatus)
+          _dispatchStreamShutdownComplete(data)
+        //QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE
+        | 8 =>
+          let data: IdealSendBufferSizeData = IdealSendBufferSizeData(@quic_stream_event_ideal_send_buffer_size_byte_count(event))
+          _dispatchIdealSendBufferSize(data)
+        //QUIC_STREAM_EVENT_PEER_ACCEPTED
+        | 9 =>
+          _dispatchPeerAccepted()
+      end
+      @quic_stream_free_event(event)
+    end
+
+  fun ref _receive(event: Pointer[None] tag) =>
+    None
 
   be _dispatchStreamStartComplete(data: StreamStartCompleteData) =>
     notifyPayload[StreamStartCompleteData](StreamStartCompleteEvent, data)
@@ -102,7 +159,7 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
     _isDestroyed = true
     let subscribers': Subscribers = subscribers()
     subscribers'.clear()
-    
+
   fun ref _close() =>
     if not destroyed() then
        @quic_stream_close_stream(_stream)

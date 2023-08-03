@@ -113,7 +113,6 @@ actor QUICConnection is NotificationEmitter
           let errorCode: U64 = @quic_connection_shutdown_initiated_by_transport_data_error_code(event)
           let data: ShutdownInitiatedByTransportData = ShutdownInitiatedByTransportData(status, errorCode)
           _dispatchShutdownInitiatedByTransport(data)
-          @quic_free(event)
         //QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER
         | 2 =>
           let data: U64 = @quic_connection_shutdown_initiated_by_peer_data(event)
@@ -125,7 +124,6 @@ actor QUICConnection is NotificationEmitter
           let data: ShutdownCompleteData = ShutdownCompleteData(data'.handshakeCompleted, data'.peerAcknowledgedShutdown, data'.appCloseInProgress)
           _dispatchShutdownComplete(data)
           _dispatchClose()
-          @quic_free(event)
           _close()
         //QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED
         | 4 =>
@@ -140,18 +138,14 @@ actor QUICConnection is NotificationEmitter
         // QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED
         | 6 =>
           let strm: Pointer[None] tag = @quic_receive_stream(event)
-          let ctx: Pointer[None] tag = @quic_stream_new_event_context()
+          let ctx: Pointer[None] tag = @quic_stream_new_event_context(addressof _QUICStreamCallback.apply)
           let stream: QUICStream = match @quic_receive_stream_type(event)
           | 1 => QUICReadableStream._create(strm, ctx)
           else
             QUICDuplexStream._create(strm, ctx)
           end
-          let streamCallback = @{(strm: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag) =>
-            _QUICStreamCallback(strm, context, event)
-          }
-
           @quic_stream_event_context_set_actor(ctx, stream)
-          @quic_stream_set_callback(stream, streamCallback, ctx)
+          @quic_stream_set_callback(strm, ctx)
           _receiveNewStream(stream)
          //QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE
         | 7 =>
@@ -236,6 +230,7 @@ actor QUICConnection is NotificationEmitter
         | 15 =>
           _dispatchPeerCertificateReceived()
       end
+      @quic_connection_free_event(event)
     else
       Println("queue is empty")
     end
@@ -265,19 +260,17 @@ actor QUICConnection is NotificationEmitter
       cb(Exception("Connection is invalid"))
       return
     end
-    let ctx: Pointer[None] tag = @quic_stream_new_event_context()
-    let streamCallback = @{(strm: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag) =>
-      _QUICStreamCallback(strm, context, event)
-    }
+    let ctx: Pointer[None] tag = @quic_stream_new_event_context(addressof _QUICStreamCallback.apply)
     try
       let flag': U32 = match flag
-      | None => 0
-      | let flag'': QUICStreamOpenFlags => flag''()
+        | None => 0
+        | let flag'': QUICStreamOpenFlags => flag''()
       end
-      let strm: Pointer[None] tag = @quic_stream_open_stream(_connection, flag', streamCallback, ctx)?
-      @quic_stream_start_stream(strm)?
+      let strm: Pointer[None] tag = @quic_stream_open_stream(_connection, flag', ctx)?
+
       iftype S <: QUICWriteableStream then
         let ws: QUICWriteableStream tag = QUICWriteableStream._create(strm, ctx)
+        @quic_stream_event_context_set_actor(ctx, ws)
         _streams.push(ws)
         let onclose: CloseNotify iso= object iso is CloseNotify
           let _connection: QUICConnection = this
@@ -289,6 +282,7 @@ actor QUICConnection is NotificationEmitter
         cb(ws)
       elseif S <: QUICDuplexStream then
         let ds: QUICDuplexStream tag = QUICDuplexStream._create(strm, ctx)
+        @quic_stream_event_context_set_actor(ctx, ds)
         _streams.push(ds)
         let onclose: CloseNotify iso= object iso is CloseNotify
           let _connection: QUICConnection = this
@@ -299,6 +293,7 @@ actor QUICConnection is NotificationEmitter
         ds.subscribe(consume onclose)
         cb(ds)
       end
+      @quic_stream_start_stream(strm)?
     else
       cb(Exception("Failed to Open Stream"))
       @quic_free(ctx)

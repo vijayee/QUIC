@@ -13,12 +13,17 @@ primitive ResumeAndZeroRTT
     @quic_server_resumption_resume_and_zerortt()
 
 
+primitive _QUICServerCallback
+  fun @apply(context: Pointer[None] tag) =>
+    let quicServer: QUICServer = @quic_server_actor(context)
+    quicServer._readEventQueue()
+
 primitive NewQUICServer
   fun apply(registration: QUICRegistration, configuration: QUICConfiguration val): QUICServer ?  =>
     let server: QUICServer = QUICServer._create(registration, configuration)
-    let ctx = @quic_new_server_event_context(server, configuration.config)
+    let ctx = @quic_new_server_event_context(server, addressof _QUICServerCallback.apply)
     try
-      let listener = @quic_server_listener_open(registration.registration, addressof server.serverCallback, ctx)?
+      let listener = @quic_server_listener_open(registration.registration, ctx)?
       server._initialize(ctx, listener)
     else
       @quic_free(ctx)
@@ -51,7 +56,7 @@ actor QUICServer is NotificationEmitter
   fun ref subscribers(): Subscribers =>
     _subscribers
 
-  be _acceptNewConnection(connection: QUICConnection) =>
+  fun ref _acceptNewConnection(connection: QUICConnection) =>
     _connections.push(connection)
     let onclose: CloseNotify iso= object iso is CloseNotify
       let _server: QUICServer = this
@@ -105,24 +110,26 @@ actor QUICServer is NotificationEmitter
     @quic_free(_ctx)
     notify(CloseEvent)
 
-  fun @serverCallback(ctx: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag): U32 =>
-    if @quic_is_new_connection_event(event) == 1 then
-      let quicServer: QUICServer = @quic_server_actor(ctx)
-      let configuration: Pointer[None] tag = @quic_server_configuration(ctx)
-      let conn: Pointer[None] tag = @quic_receive_connection(event)
-      let connectionCtx: Pointer[None] tag = @quic_new_connection_event_context[Pointer[None] tag](0, Pointer[None])
-      let connection: QUICConnection = QUICConnection._serverConnection(conn, connectionCtx)
-      @quic_connection_event_context_set_actor(connectionCtx, connection)
+  be _readEventQueue() =>
+    try
+      let event: Pointer[None] tag = @quic_dequeue_event(_ctx)?
+      match @quic_server_event_type_as_int(event)
+        | 0  =>
+          let conn: Pointer[None] tag = @quic_receive_connection(event)
+          let connectionCtx: Pointer[None] tag = @quic_new_connection_event_context(0, Pointer[None])
+          let connection: QUICConnection = QUICConnection._serverConnection(conn, connectionCtx)
+          @quic_connection_event_context_set_actor(connectionCtx, connection)
 
-      @quic_connection_set_callback(conn, addressof _QUICConnectionCallback.apply, connectionCtx)
-      let status: U32 = @quic_connection_set_configuration(conn, configuration)
+          @quic_connection_set_callback(conn, addressof _QUICConnectionCallback.apply, connectionCtx)
+          let status: U32 = @quic_connection_set_configuration(conn, _configuration.config)
 
-      if status == 0 then
-        quicServer._acceptNewConnection(connection)
+          if status == 0 then
+            _acceptNewConnection(connection)
+          end
+      | 1 =>
+        return
       end
-      return status
-    else
-      return 0
+      @quic_server_free_event(event)
     end
 
   fun _final() =>

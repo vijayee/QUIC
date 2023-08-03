@@ -24,66 +24,11 @@ primitive ShutdownInline
 
 type QUICStreamShutdownFlags is (ShutdownGraceful | ShutdownAbortSend | ShutdownAbortReceive | ShutdownAbort | ShutdownImmediate)
 
+
 primitive _QUICStreamCallback
-  fun apply(strm: Pointer[None] tag, context: Pointer[None] tag, event: Pointer[None] tag) : U32 =>
-  let stream: QUICStream = @quic_stream_actor(context)
-  match @quic_get_stream_event_type_as_uint(event)
-    //QUIC_STREAM_EVENT_START_COMPLETE
-    | 0 =>
-      var data': _StreamStartCompleteData = @quic_stream_start_complete_data(event)
-      var data: StreamStartCompleteData = StreamStartCompleteData(data'.status,
-        data'.id,
-        data'.peerAccepted == 1)
-      stream._dispatchStreamStartComplete(data)
-    //QUIC_STREAM_EVENT_RECEIVE
-    | 1 =>
-      match stream
-        | let stream': QUICDuplexStream =>
-          stream'._receive(event)
-        | let stream': QUICReadableStream =>
-          stream'._receive(event)
-        else
-          return 1
-      end
-      return @quic_stream_status_pending()
-    //QUIC_STREAM_EVENT_SEND_COMPLETE
-    | 2 =>
-      let data: SendCompleteData = SendCompleteData(@quic_stream_event_send_shutdown_complete_graceful(event) == 1)
-      stream._dispatchSendComplete(data)
-    //QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN
-    | 3 =>
-      stream._dispatchPeerSendShutdown()
-    //QUIC_STREAM_EVENT_PEER_SEND_ABORTED
-    | 4 =>
-      let data: PeerSendAbortedData = PeerSendAbortedData(@quic_stream_event_peer_send_aborted_error_code(event))
-      stream._dispatchPeerSendAborted(data)
-    //QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED
-    | 5 =>
-      let data: PeerReceiveAbortedData = PeerReceiveAbortedData(@quic_stream_event_peer_receive_aborted_error_code(event))
-      stream._dispatchPeerReceiveAborted(data)
-    //QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
-    | 6 =>
-      let data: SendShutdownCompleteData = SendShutdownCompleteData(@quic_stream_event_send_shutdown_complete_graceful(event) == 1)
-      stream._dispatchSendShutdownComplete(data)
-    //QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE
-    | 7 =>
-      let data': _StreamShutdownCompleteData= @quic_stream_shutdown_complete_data(event)
-      let data: StreamShutdownCompleteData = StreamShutdownCompleteData(data'.connectionShutdown == 1,
-        data'.appCloseInProgress == 1,
-        data'.connectionShutdownByApp == 1,
-        data'.connectionClosedRemotely == 1,
-        data'.connectionErrorCode,
-        data'.connectionCloseStatus)
-      stream._dispatchStreamShutdownComplete(data)
-    //QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE
-    | 8 =>
-      let data: IdealSendBufferSizeData = IdealSendBufferSizeData(@quic_stream_event_ideal_send_buffer_size_byte_count(event))
-      stream._dispatchIdealSendBufferSize(data)
-    //QUIC_STREAM_EVENT_PEER_ACCEPTED
-    | 9 =>
-      stream._dispatchPeerAccepted()
-  end
-  0
+  fun @apply(context: Pointer[None] tag) =>
+    let stream: QUICStream = @quic_stream_actor(context)
+
 
 actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
   var _readable: Bool = true
@@ -119,7 +64,61 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
     @quic_free(_ctx)
     @quic_stream_close_stream(_stream)
 
-  be _receive(event: Pointer[None] tag) =>
+  be _readEventQueue() =>
+    try
+      let event: Pointer[None] tag = @quic_dequeue_event(_ctx)?
+      match @quic_get_stream_event_type_as_int(event)
+        //QUIC_STREAM_EVENT_START_COMPLETE
+        | 0 =>
+          var data': _StreamStartCompleteData = @quic_stream_start_complete_data(event)
+          var data: StreamStartCompleteData = StreamStartCompleteData(data'.status,
+            data'.id,
+            data'.peerAccepted == 1)
+          _dispatchStreamStartComplete(data)
+        //QUIC_STREAM_EVENT_RECEIVE
+        | 1 =>
+            _receive(event)
+        //QUIC_STREAM_EVENT_SEND_COMPLETE
+        | 2 =>
+          let data: SendCompleteData = SendCompleteData(@quic_stream_event_send_shutdown_complete_graceful(event) == 1)
+          _dispatchSendComplete(data)
+        //QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN
+        | 3 =>
+          _dispatchPeerSendShutdown()
+        //QUIC_STREAM_EVENT_PEER_SEND_ABORTED
+        | 4 =>
+          let data: PeerSendAbortedData = PeerSendAbortedData(@quic_stream_event_peer_send_aborted_error_code(event))
+          _dispatchPeerSendAborted(data)
+        //QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED
+        | 5 =>
+          let data: PeerReceiveAbortedData = PeerReceiveAbortedData(@quic_stream_event_peer_receive_aborted_error_code(event))
+          _dispatchPeerReceiveAborted(data)
+        //QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
+        | 6 =>
+          let data: SendShutdownCompleteData = SendShutdownCompleteData(@quic_stream_event_send_shutdown_complete_graceful(event) == 1)
+          _dispatchSendShutdownComplete(data)
+        //QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE
+        | 7 =>
+          let data': _StreamShutdownCompleteData= @quic_stream_shutdown_complete_data(event)
+          let data: StreamShutdownCompleteData = StreamShutdownCompleteData(data'.connectionShutdown == 1,
+            data'.appCloseInProgress == 1,
+            data'.connectionShutdownByApp == 1,
+            data'.connectionClosedRemotely == 1,
+            data'.connectionErrorCode,
+            data'.connectionCloseStatus)
+          _dispatchStreamShutdownComplete(data)
+        //QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE
+        | 8 =>
+          let data: IdealSendBufferSizeData = IdealSendBufferSizeData(@quic_stream_event_ideal_send_buffer_size_byte_count(event))
+          _dispatchIdealSendBufferSize(data)
+        //QUIC_STREAM_EVENT_PEER_ACCEPTED
+        | 9 =>
+          _dispatchPeerAccepted()
+      end
+      @quic_stream_free_event(event)
+    end
+
+  fun ref _receive(event: Pointer[None] tag) =>
     let data: Array[U8] iso = recover
       let size: USize = @quic_stream_get_total_buffer_length(event).usize()
       let buffer: Pointer[U8] = @pony_alloc(@pony_ctx(), size)
@@ -151,20 +150,20 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
     end
     notifyData(consume data)
 
-  be _dispatchStreamStartComplete(data: StreamStartCompleteData) =>
+  fun ref _dispatchStreamStartComplete(data: StreamStartCompleteData) =>
     notifyPayload[StreamStartCompleteData](StreamStartCompleteEvent, data)
 
-  be _dispatchSendComplete(data: SendCompleteData) =>
+  fun ref _dispatchSendComplete(data: SendCompleteData) =>
     notifyPayload[SendCompleteData](SendCompleteEvent, data)
 
-  be _dispatchPeerSendShutdown() =>
+  fun ref _dispatchPeerSendShutdown() =>
     _readable = false
     notify(PeerSendShutdownEvent)
 
-  be _dispatchSendShutdownComplete(data: SendShutdownCompleteData) =>
+  fun ref _dispatchSendShutdownComplete(data: SendShutdownCompleteData) =>
     notifyPayload[SendShutdownCompleteData](SendShutdownCompleteEvent, data)
 
-  be _dispatchPeerReceiveAborted(data: PeerReceiveAbortedData) =>
+  fun ref _dispatchPeerReceiveAborted(data: PeerReceiveAbortedData) =>
     _writeable = false
 
     //TODO is this correct behavior?
@@ -179,7 +178,7 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
     end
     notifyPayload[PeerReceiveAbortedData](PeerReceiveAbortedEvent, data)
 
-  be _dispatchPeerSendAborted(data: PeerSendAbortedData) =>
+  fun ref _dispatchPeerSendAborted(data: PeerSendAbortedData) =>
     _readable = false
     if (_buffer.size() == 0) and not _readable and not _writeable then
       try
@@ -192,13 +191,13 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
     end
     notifyPayload[PeerSendAbortedData](PeerSendAbortedEvent, data)
 
-  be _dispatchStreamShutdownComplete(data: StreamShutdownCompleteData) =>
+  fun ref _dispatchStreamShutdownComplete(data: StreamShutdownCompleteData) =>
     notifyPayload[StreamShutdownCompleteData](StreamShutdownCompleteEvent, data)
 
-  be _dispatchIdealSendBufferSize(data: IdealSendBufferSizeData) =>
+  fun ref _dispatchIdealSendBufferSize(data: IdealSendBufferSizeData) =>
     notifyPayload[IdealSendBufferSizeData](IdealSendBufferSizeEvent, data)
 
-  be _dispatchPeerAccepted() =>
+  fun ref _dispatchPeerAccepted() =>
     notify(PeerAcceptedEvent)
 
   be push() =>

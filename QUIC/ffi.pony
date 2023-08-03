@@ -47,8 +47,8 @@ use @quic_connection_actor[QUICConnection](ctx: Pointer[None] tag)
 use @quic_get_connection_event_type_as_int[I32](event: Pointer[None] tag)
 use @quic_receive_stream[Pointer[None] tag](event: Pointer[None] tag)
 use @quic_receive_stream_type[U32](event: Pointer[None] tag)
-use @quic_stream_set_callback[None](stream: QUICStream, streamCallback: Pointer[None] tag, ctx: Pointer[None] tag)
-use @quic_stream_new_event_context[Pointer[None] tag]()
+use @quic_stream_set_callback[None](stream: Pointer[None] tag, ctx: Pointer[None] tag)
+use @quic_stream_new_event_context[Pointer[None] tag](cb: Pointer[None] tag)
 use @quic_stream_event_context_set_actor[None](ctx: Pointer[None] tag, streamActor: QUICStream)
 use @quic_connection_open[Pointer[None] tag](registration: Pointer[None] tag, callback:Pointer[None] tag, ctx: Pointer[None] tag)?
 use @quic_free_connection_event_context[None](ctx: Pointer[None] tag)
@@ -82,7 +82,7 @@ use @quic_stream_status_pending[U32]()
 use @pony_alloc[Pointer[U8]](ctx: Pointer[None], size: USize)
 use @pony_ctx[Pointer[None]]()
 use @quic_stream_actor[QUICStream](ctx: Pointer[None] tag)
-use @quic_get_stream_event_type_as_uint[U32](event: Pointer[None] tag)
+use @quic_get_stream_event_type_as_int[I32](event: Pointer[None] tag)
 
 use @quic_connection_set_connected_event[None](ctx: Pointer[None], value: U8)
 use @quic_connection_set_shutdown_initiated_by_transport_event[None](ctx: Pointer[None], value: U8)
@@ -106,17 +106,16 @@ use @quic_free_registration[None](registration: Pointer[None] tag)
 use @quic_new_registration_config[Pointer[None] tag](appName: Pointer[U8 val] tag, executionProfile: I32)
 use @quic_free[None](ptr: Pointer[None] tag)
 
-use @quic_is_new_connection_event[U8](event:Pointer[None] tag)
-use @quic_server_listener_open[Pointer[None] tag](registration: Pointer[None] tag, serverListenerCallback: Pointer[None] tag, ctx: Pointer[None] tag)?
+use @quic_server_event_type_as_int[I32](event:Pointer[None] tag)
+use @quic_server_listener_open[Pointer[None] tag](registration: Pointer[None] tag, ctx: Pointer[None] tag)?
 use @quic_server_listener_close[None](listener: Pointer[None] tag)
-use @quic_server_configuration[Pointer[None]](ctx: Pointer[None] tag)
 use @quic_server_actor[QUICServer](ctx: Pointer[None] tag)
 use @quic_receive_connection[Pointer[None] tag](event: Pointer[None] tag)
 use @quic_connection_set_configuration[U32](connection: Pointer[None] tag, configuration: Pointer[None] tag)
 use @quic_send_resumption_ticket[None](connection: Pointer[None] tag)
 use @quic_close_connection[None](connection: Pointer[None] tag)
 use @quic_connection_set_callback[None](connection: Pointer[None] tag, connectionCallback: Pointer[None] tag, ctx: Pointer[None] tag)
-use @quic_new_server_event_context[Pointer[None] tag](serverActor: QUICServer, configuration: Pointer[None] tag)
+use @quic_new_server_event_context[Pointer[None] tag](serverActor: QUICServer, cb: Pointer[None] tag)
 use @quic_new_connection_event_context[Pointer[None] tag](isClient: U8, cb: Pointer[None] tag)
 use @quic_connection_event_context_set_actor[None](ctx: Pointer[None] tag, connectionActor: QUICConnection)
 
@@ -127,7 +126,7 @@ use @quic_stream_event_peer_receive_aborted_error_code[U64](event: Pointer[None]
 use @quic_stream_event_send_shutdown_complete_graceful[U8](event: Pointer[None] tag)
 use @quic_stream_shutdown_complete_data[_StreamShutdownCompleteData](event: Pointer[None] tag)
 use @quic_stream_event_ideal_send_buffer_size_byte_count[U64](event: Pointer[None] tag)
-use @quic_stream_open_stream[Pointer[None] tag](connection: Pointer[None] tag, flag: U32, callback: Pointer[None] tag, ctx: Pointer[None] tag)?
+use @quic_stream_open_stream[Pointer[None] tag](connection: Pointer[None] tag, flag: U32, ctx: Pointer[None] tag)?
 use @quic_stream_close_stream[None](stream: Pointer[None] tag)
 use @quic_stream_start_stream[None](stream: Pointer[None] tag)?
 use @quic_stream_send[None](stream: Pointer[None] tag, bufferf: Pointer[U8] tag, bufferLength: USize)?
@@ -148,3 +147,6 @@ use @quic_server_listener_stop[None](listener: Pointer[None] tag)
 use @quic_configuration_close[None](configuration: Pointer[None] tag)
 use @quic_connection_is_client[U8](ctx: Pointer[None] tag)
 use @quic_dequeue_event[Pointer[None] tag](ctx: Pointer[None] tag)?
+use @quic_stream_free_event[None](event:Pointer[None] tag)
+use @quic_connection_free_event[None](event:Pointer[None] tag)
+use @quic_server_free_event[None](event: Pointer[None] tag)
