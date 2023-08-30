@@ -27,9 +27,10 @@ class iso _TestServer is UnitTest
   new create() =>
     custodian = QUICCustodian
   fun apply(t: TestHelper) =>
-    t.long_test(5000000000)
+    t.long_test(500000000000)
     t.expect_action("listener started")
     t.expect_action("listener stopped")
+    t.expect_action("client connection")
     try
       let registration = QUICRegistration(t.env.root, "test")?
       let settings: QUICSettings iso = recover
@@ -69,6 +70,11 @@ class iso _TestServer is UnitTest
             Println("closed")
             _configuration.close()
         end
+        let newConnectionNotify: NewConnectionNotify = object iso is NewConnectionNotify
+          let _t: TestHelper = t
+          fun ref apply(data: QUICConnection) =>
+            _t.complete_action("client connection")
+        end
         try
           let server = NewQUICServer(registration, configuration)?
           custodian(server)
@@ -89,4 +95,4 @@ class iso _TestServer is UnitTest
     else
       t.fail("Registration Error")
     end
-    t.complete(true)
+    

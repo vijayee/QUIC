@@ -1,7 +1,7 @@
 use "collections"
 use "Streams"
 use "Exception"
-
+use "Print"
 primitive NoResume
   fun apply(): U8 =>
     @quic_server_resumption_no_resume()
@@ -65,6 +65,8 @@ actor QUICServer is NotificationEmitter
           _server._removeConnection(_connection)
     end
     connection.subscribe(consume onclose)
+    notifyPayload[QUICConnection](NewConnectionEvent, connection)
+
 
   be _removeConnection(connection: QUICConnection) =>
     var i: USize = 0
@@ -112,7 +114,7 @@ actor QUICServer is NotificationEmitter
 
   be _readEventQueue() =>
     try
-      let event: Pointer[None] tag = @quic_dequeue_event(_ctx)?
+      let event: Pointer[None] tag = @quic_dequeue_event(_ctx, 1)?
       match @quic_server_event_type_as_int(event)
         | 0  =>
           let conn: Pointer[None] tag = @quic_receive_connection(event)
@@ -133,6 +135,7 @@ actor QUICServer is NotificationEmitter
     end
 
   fun _final() =>
+    Println("GC Happening")
     if not _isClosed then
       @quic_server_listener_close(_listener)
       @quic_free(_listener)

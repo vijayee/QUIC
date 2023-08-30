@@ -55,7 +55,6 @@ primitive NewQUICConnection
       let connection = QUICConnection._create(configuration)
       @quic_connection_event_context_set_actor(ctx, connection)
       let conn = @quic_connection_open(registration.registration, addressof _QUICConnectionCallback.apply, ctx)?
-
       connection._initialize(ctx, conn)
       connection
     else
@@ -92,7 +91,7 @@ actor QUICConnection is NotificationEmitter
 
   be _readEventQueue() =>
     try
-      let event: Pointer[None] tag = @quic_dequeue_event(_ctx)?
+      let event: Pointer[None] tag = @quic_dequeue_event(_ctx, 1)?
       match  @quic_get_connection_event_type_as_int(event)
         //QUIC_CONNECTION_EVENT_CONNECTED
         | 0 =>
@@ -266,6 +265,7 @@ actor QUICConnection is NotificationEmitter
         | None => 0
         | let flag'': QUICStreamOpenFlags => flag''()
       end
+
       let strm: Pointer[None] tag = @quic_stream_open_stream(_connection, flag', ctx)?
 
       iftype S <: QUICWriteableStream then
@@ -293,6 +293,7 @@ actor QUICConnection is NotificationEmitter
         ds.subscribe(consume onclose)
         cb(ds)
       end
+
       @quic_stream_start_stream(strm)?
     else
       cb(Exception("Failed to Open Stream"))

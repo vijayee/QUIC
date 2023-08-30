@@ -286,3 +286,12 @@ trait ListenerStoppedNotify is VoidNotify
 
 primitive ListenerStoppedEvent is ListenerStoppedNotify
   fun ref apply() => None
+
+//server events
+trait NewConnectionNotify is PayloadNotify[QUICConnection]
+  fun ref apply(data: QUICConnection) => None
+  fun box hash(): USize =>
+    QUICHashspace() + 28
+    
+primitive NewConnectionEvent is NewConnectionNotify
+  fun ref apply(data: QUICConnection) => None

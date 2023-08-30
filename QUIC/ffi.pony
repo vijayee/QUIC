@@ -146,7 +146,9 @@ use @quic_address_family_inet6[I32]()
 use @quic_server_listener_stop[None](listener: Pointer[None] tag)
 use @quic_configuration_close[None](configuration: Pointer[None] tag)
 use @quic_connection_is_client[U8](ctx: Pointer[None] tag)
-use @quic_dequeue_event[Pointer[None] tag](ctx: Pointer[None] tag)?
+use @quic_dequeue_event[Pointer[None] tag](ctx: Pointer[None] tag, queueType: U8)?
 use @quic_stream_free_event[None](event:Pointer[None] tag)
 use @quic_connection_free_event[None](event:Pointer[None] tag)
 use @quic_server_free_event[None](event: Pointer[None] tag)
+use @printStreamEventPointer[None](event: Pointer[None] tag)
+use @transferEvent[Pointer[None] tag](event: Pointer[None] tag)

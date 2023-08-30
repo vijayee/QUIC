@@ -15,6 +15,11 @@ libponyquic: build
 	#cd build/lib && ar -x  $(MSQUICLIBPATH)/libmsquic.a # && ar -x  $(OPENSSLPATH)/libcrypto.a
 	ar rcs build/lib/libponyquic.a build/lib/*.o
 	rm build/lib/*.o
+libponyquicAS: build
+	clang -g -fsanitize=address -v -fPIC -O3 -o build/lib/quic.o -c QUIC/c/quic.c -L$(MSQUICLIBPATH) -I$(PONYINCPATH) -I$(MSINCQUICPATH) -lponyrt -lmsquic #-I$(OPENSSLINCPATH)
+	#cd build/lib && ar -x  $(MSQUICLIBPATH)/libmsquic.a # && ar -x  $(OPENSSLPATH)/libcrypto.a
+	ar rcs build/lib/libponyquic.a build/lib/*.o
+	rm build/lib/*.o
 install: libponyquic
 	mkdir -p /usr/local/lib/NeatCrypto
 	cp build/lib/libponyquic.a /usr/local/lib/QUIC

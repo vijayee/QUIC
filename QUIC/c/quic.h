@@ -5,12 +5,13 @@
 #if _WIN32
   #include <windows.h>
 #endif
+#include "queue.h"
 static QUIC_API_TABLE* MSQuic;
 static size_t registration_count;
 // Create a new registration object
 // also initialize the apitable if it is uninitialized
-HQUIC* quic_new_registration(QUIC_REGISTRATION_CONFIG* config);
-void quic_free_registration(HQUIC* registration);
+HQUIC quic_new_registration(QUIC_REGISTRATION_CONFIG* config);
+void quic_free_registration(HQUIC registration);
 QUIC_REGISTRATION_CONFIG* quic_new_registration_config(const char* appName, int32_t executionProfile);
 QUIC_CERTIFICATE_FILE*  quic_certificate_file(const char* privateKeyFile, const char* certificateFile);
 QUIC_CERTIFICATE_FILE_PROTECTED* quic_certificate_file_protected(const char* certificateFile, const char* privateKeyFile, const char* privateKeyPassword);
@@ -73,7 +74,7 @@ QUIC_SETTINGS* quic_new_settings(struct quic_setting_value_uint64_t maxBytesPerK
     struct quic_setting_value_uint8_t maxOperationsPerDrain,
     struct quic_setting_value_uint8_t mtuDiscoveryMissingProbeCount,
     struct quic_setting_value_uint32_t destCidUpdateIdleTimeoutMs);
-HQUIC* quic_new_configuration(HQUIC* registration, char** alpn, uint32_t alpnSize, QUIC_SETTINGS* settings);
+HQUIC* quic_new_configuration(HQUIC registration, char** alpn, uint32_t alpnSize, QUIC_SETTINGS* settings);
 void quic_configuration_load_credential(HQUIC* configuration, QUIC_CREDENTIAL_CONFIG* credentials);
 int quic_server_event_type_as_int(QUIC_LISTENER_EVENT* event);
 typedef enum quic_event_type {
@@ -96,42 +97,43 @@ typedef struct {
      CRITICAL_SECTION lock;
    #endif
    quic_event_queue_node* next;
+   quic_event_queue_node* current;
    size_t length;
 } quic_event_queue;
 
 
 typedef struct  quic_server_event_context {
+  quic_event_queue events;
   void* serverActor;
   void* cb;
-  quic_event_queue events;
 } quic_server_event_context;
 
-HQUIC* quic_server_listener_open(HQUIC* registration, quic_server_event_context* ctx);
-void quic_server_listener_close(HQUIC* listener);
-HQUIC* quic_receive_connection(QUIC_LISTENER_EVENT* event);
-uint32_t quic_connection_set_configuration(HQUIC* connection, HQUIC* configuration);
-void quic_connection_set_callback(HQUIC* connection, void* connectionCallback, void* ctx);
+HQUIC quic_server_listener_open(HQUIC registration, quic_server_event_context* ctx);
+void quic_server_listener_close(HQUIC listener);
+HQUIC quic_receive_connection(QUIC_LISTENER_EVENT* event);
+uint32_t quic_connection_set_configuration(HQUIC connection, HQUIC* configuration);
+void quic_connection_set_callback(HQUIC connection, void* connectionCallback, void* ctx);
 int quic_get_connection_event_type_as_uint(QUIC_CONNECTION_EVENT* event);
-void quic_send_resumption_ticket(HQUIC* connection);
-void quic_close_connection(HQUIC* connection);
-HQUIC* quic_receive_stream(QUIC_CONNECTION_EVENT* event);
+void quic_send_resumption_ticket(HQUIC connection);
+void quic_close_connection(HQUIC connection);
+HQUIC quic_receive_stream(QUIC_CONNECTION_EVENT* event);
 uint32_t quic_receive_stream_type(QUIC_CONNECTION_EVENT* event);
-void quic_stream_set_callback(HQUIC* stream, void* ctx);
+void quic_stream_set_callback(HQUIC stream, void* ctx);
 int quic_get_stream_event_type_as_int(QUIC_STREAM_EVENT* event);
 uint32_t quic_stream_status_pending();
 uint64_t quic_stream_get_total_buffer_length(QUIC_STREAM_EVENT* event);
-void quic_stream_get_total_buffer(QUIC_STREAM_EVENT* event, uint8_t* buffer, HQUIC* stream);
+void quic_stream_get_total_buffer(QUIC_STREAM_EVENT* event, uint8_t* buffer, HQUIC stream);
 
 
 
 quic_server_event_context* quic_new_server_event_context(void* serverActor, void* cb);
 
 typedef struct  quic_connection_event_context {
+  quic_event_queue events;
   void* connectionActor;
   uint8_t isClient;
   uint8_t QUIC_CONNECTION_EVENT_CONNECTED;
   void* cb;
-  quic_event_queue events;
   #if __linux__
     pthread_mutex_t QUIC_CONNECTION_EVENT_CONNECTED_LOCK;
   #endif
@@ -254,7 +256,7 @@ void quic_connection_event_context_set_actor(quic_connection_event_context* ctx,
 
 void quic_free_connection_event_context(quic_connection_event_context* ctx);
 
-HQUIC* quic_connection_open(HQUIC* registration, void* callback, quic_connection_event_context* ctx);
+HQUIC quic_connection_open(HQUIC registration, void* callback, quic_connection_event_context* ctx);
 void quic_connection_set_connected_event(quic_connection_event_context* ctx, uint8_t value);
 void quic_connection_set_shutdown_initiated_by_transport_event(quic_connection_event_context* ctx, uint8_t value);
 void quic_connection_set_shutdown_initiated_by_peer_event(quic_connection_event_context* ctx, uint8_t value);
@@ -310,8 +312,8 @@ uint32_t quic_connection_event_resumption_ticket_received_resumption_ticket_leng
 void quic_connection_event_resumption_ticket_received_resumption_ticket(QUIC_CONNECTION_EVENT* event, uint8_t* buffer);
 
 typedef struct  quic_stream_event_context {
-  void* streamActor;
   quic_event_queue events;
+  void* streamActor;
   void* cb;
 } quic_stream_event_context;
 
@@ -342,28 +344,31 @@ struct stream_shutdown_complete_data {
 
 struct stream_shutdown_complete_data quic_stream_shutdown_complete_data(QUIC_STREAM_EVENT * event);
 uint64_t quic_stream_event_ideal_send_buffer_size_byte_count(QUIC_STREAM_EVENT * event);
-HQUIC* quic_stream_open_stream(HQUIC* connection, QUIC_STREAM_OPEN_FLAGS flag, void* ctx);
-void quic_stream_close_stream(HQUIC* stream);
-void quic_stream_start_stream(HQUIC* stream, QUIC_STREAM_START_FLAGS flag);
-void quic_stream_send(HQUIC* stream, uint8_t* buffer, size_t bufferLength);
-void quic_stream_shutdown(HQUIC* stream, QUIC_STREAM_SHUTDOWN_FLAGS flag);
-void quic_connection_start(HQUIC* connection, HQUIC* configuration, int family, char * target, uint16_t port);
-void quic_connection_set_resumption_ticket(HQUIC* connection, uint8_t * ticket, uint32_t ticketLength);
-void quic_connection_shutdown(HQUIC* connection);
-void quic_connection_close(HQUIC* connection);
+HQUIC quic_stream_open_stream(HQUIC connection, QUIC_STREAM_OPEN_FLAGS flag, void* ctx);
+void quic_stream_close_stream(HQUIC stream);
+void quic_stream_start_stream(HQUIC stream, QUIC_STREAM_START_FLAGS flag);
+void quic_stream_send(HQUIC stream, uint8_t* buffer, size_t bufferLength);
+void quic_stream_shutdown(HQUIC stream, QUIC_STREAM_SHUTDOWN_FLAGS flag);
+void quic_connection_start(HQUIC connection, HQUIC* configuration, int family, char * target, uint16_t port);
+void quic_connection_set_resumption_ticket(HQUIC connection, uint8_t * ticket, uint32_t ticketLength);
+void quic_connection_shutdown(HQUIC connection);
+void quic_connection_close(HQUIC connection);
 
 uint8_t quic_server_resumption_no_resume();
 uint8_t quic_server_resumption_resume_only();
 uint8_t quic_server_resumption_resume_and_zerortt();
-void quic_server_listener_start(HQUIC* listener, char** alpn, uint32_t alpnSize, int family, char* ip, char* port);
+void quic_server_listener_start(HQUIC listener, char** alpn, uint32_t alpnSize, int family, char* ip, char* port);
 int quic_address_family_unspecified();
 int quic_address_family_inet();
 int quic_address_family_inet6();
-void quic_server_listener_stop(HQUIC* listener);
+void quic_server_listener_stop(HQUIC listener);
 void quic_configuration_close(HQUIC* configuration);
 uint8_t quic_connection_is_client(quic_connection_event_context* ctx);
 void quic_enqueue_event(quic_event_queue* queue, void* event, quic_event_type type);
-void* quic_dequeue_event(void* context);
+void* quic_dequeue_event(void* context, uint8_t type);
 void quic_stream_free_event(QUIC_STREAM_EVENT* event);
 void quic_connection_free_event(QUIC_CONNECTION_EVENT* event);
 void quic_server_free_event(QUIC_LISTENER_EVENT* event);
+void printQueue(quic_event_queue* queue);
+void printStreamEventPointer(QUIC_STREAM_EVENT* event);
+void* transferEvent(QUIC_STREAM_EVENT* event);

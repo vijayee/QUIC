@@ -19,12 +19,12 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
     _isDestroyed
 
   fun _final() =>
-    @quic_free(_ctx)
     @quic_stream_close_stream(_stream)
+    @quic_free(_ctx)
 
   be _readEventQueue() =>
     try
-      let event: Pointer[None] tag = @quic_dequeue_event(_ctx)?
+      let event: Pointer[None] tag = @quic_dequeue_event(_ctx, 2)?
       match @quic_get_stream_event_type_as_int(event)
         //QUIC_STREAM_EVENT_START_COMPLETE
         | 0 =>

@@ -1,6 +1,7 @@
 use "Streams"
 use "Exception"
 use "collections"
+use "Print"
 
 type QUICStream is (QUICDuplexStream | QUICReadableStream | QUICWriteableStream)
 
@@ -28,6 +29,7 @@ type QUICStreamShutdownFlags is (ShutdownGraceful | ShutdownAbortSend | Shutdown
 primitive _QUICStreamCallback
   fun @apply(context: Pointer[None] tag) =>
     let stream: QUICStream = @quic_stream_actor(context)
+    stream._readEventQueue()
 
 
 actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
@@ -61,15 +63,23 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
     _auto
 
   fun _final() =>
-    @quic_free(_ctx)
+    Println("Final Stream Block")
     @quic_stream_close_stream(_stream)
+    @quic_free(_ctx)
 
   be _readEventQueue() =>
     try
-      let event: Pointer[None] tag = @quic_dequeue_event(_ctx)?
+      Println("Let see")
+      let event: Pointer[None] tag = @quic_dequeue_event(_ctx, 2)?
+
+      Println("We got the event")
+      Println("something else is happening")
+      //@printStreamEventPointer(event)
+
       match @quic_get_stream_event_type_as_int(event)
         //QUIC_STREAM_EVENT_START_COMPLETE
         | 0 =>
+          @printStreamEventPointer(event)
           var data': _StreamStartCompleteData = @quic_stream_start_complete_data(event)
           var data: StreamStartCompleteData = StreamStartCompleteData(data'.status,
             data'.id,
