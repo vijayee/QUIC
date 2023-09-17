@@ -50,14 +50,16 @@ type QUICAddressFamily is (Unspecified| INET | INET6)
 
 primitive NewQUICConnection
   fun apply(registration: QUICRegistration, configuration: QUICConfiguration val): QUICConnection ? =>
-    let ctx = @quic_new_connection_event_context(1, addressof _QUICConnectionCallback.apply)
+    let queue: Pointer[None] tag = @quic_new_event_queue()
+    let ctx = @quic_new_connection_event_context(1, addressof _QUICConnectionCallback.apply, queue)
     try
       let connection = QUICConnection._create(configuration)
       @quic_connection_event_context_set_actor(ctx, connection)
       let conn = @quic_connection_open(registration.registration, addressof _QUICConnectionCallback.apply, ctx)?
-      connection._initialize(ctx, conn)
+      connection._initialize(ctx, conn, queue)
       connection
     else
+      @quic_free(queue)
       @quic_free_connection_event_context(ctx)
       error
     end
@@ -70,19 +72,22 @@ actor QUICConnection is NotificationEmitter
   var _invalid: Bool = true
   var _started: Bool = false
   var _configuration: (QUICConfiguration val | None) = None
+  var _queue: Pointer[None] tag
 
 
   new _create(configuration: QUICConfiguration val) =>
     _configuration = configuration
     _streams = Array[QUICStream](3)
     _ctx = Pointer[None]
+    _queue = Pointer[None]
     _subscribers = Subscribers
     _connection = Pointer[None]
 
-  new _serverConnection(conn: Pointer[None] tag, ctx: Pointer[None] tag) =>
+  new _serverConnection(conn: Pointer[None] tag, ctx: Pointer[None] tag, queue: Pointer[None] tag) =>
     _streams = Array[QUICStream](3)
     _connection = conn
     _ctx = ctx
+    _queue = queue
     _subscribers = Subscribers
     _invalid = false
 
@@ -91,7 +96,7 @@ actor QUICConnection is NotificationEmitter
 
   be _readEventQueue() =>
     try
-      let event: Pointer[None] tag = @quic_dequeue_event(_ctx, 1)?
+      let event: Pointer[None] tag = @quic_dequeue_event(_queue, 1)?
       match  @quic_get_connection_event_type_as_int(event)
         //QUIC_CONNECTION_EVENT_CONNECTED
         | 0 =>
@@ -137,14 +142,15 @@ actor QUICConnection is NotificationEmitter
         // QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED
         | 6 =>
           let strm: Pointer[None] tag = @quic_receive_stream(event)
-          let ctx: Pointer[None] tag = @quic_stream_new_event_context(addressof _QUICStreamCallback.apply)
+          let queue = @quic_new_event_queue()
+          let ctx: Pointer[None] tag = @quic_stream_new_event_context(addressof _QUICStreamCallback.apply, queue)
           let stream: QUICStream = match @quic_receive_stream_type(event)
-          | 1 => QUICReadableStream._create(strm, ctx)
+          | 1 => QUICReadableStream._create(strm, _ctx, queue)
           else
-            QUICDuplexStream._create(strm, ctx)
+            QUICDuplexStream._create(strm, _ctx, queue)
           end
-          @quic_stream_event_context_set_actor(ctx, stream)
-          @quic_stream_set_callback(strm, ctx)
+          @quic_stream_event_context_set_actor(_ctx, stream)
+          @quic_stream_set_callback(strm, _ctx)
           _receiveNewStream(stream)
          //QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE
         | 7 =>
@@ -230,14 +236,13 @@ actor QUICConnection is NotificationEmitter
           _dispatchPeerCertificateReceived()
       end
       @quic_connection_free_event(event)
-    else
-      Println("queue is empty")
     end
 
-  be _initialize(ctx: Pointer[None] tag, connection: Pointer[None] tag) =>
+  be _initialize(ctx: Pointer[None] tag, connection: Pointer[None] tag, queue: Pointer[None] tag) =>
     _invalid = false
     _ctx = ctx
     _connection = connection
+    _queue = queue
 
   be start( ip: String, port: U16, family: QUICAddressFamily = Unspecified, resumptionTicket: (Array[U8] val | None) = None) =>
     if not _started then
@@ -259,7 +264,8 @@ actor QUICConnection is NotificationEmitter
       cb(Exception("Connection is invalid"))
       return
     end
-    let ctx: Pointer[None] tag = @quic_stream_new_event_context(addressof _QUICStreamCallback.apply)
+    let queue: Pointer[None] tag = @quic_new_event_queue()
+    let ctx: Pointer[None] tag = @quic_stream_new_event_context(addressof _QUICStreamCallback.apply, queue)
     try
       let flag': U32 = match flag
         | None => 0
@@ -269,7 +275,7 @@ actor QUICConnection is NotificationEmitter
       let strm: Pointer[None] tag = @quic_stream_open_stream(_connection, flag', ctx)?
 
       iftype S <: QUICWriteableStream then
-        let ws: QUICWriteableStream tag = QUICWriteableStream._create(strm, ctx)
+        let ws: QUICWriteableStream tag = QUICWriteableStream._create(strm, ctx, queue)
         @quic_stream_event_context_set_actor(ctx, ws)
         _streams.push(ws)
         let onclose: CloseNotify iso= object iso is CloseNotify
@@ -281,7 +287,7 @@ actor QUICConnection is NotificationEmitter
         ws.subscribe(consume onclose)
         cb(ws)
       elseif S <: QUICDuplexStream then
-        let ds: QUICDuplexStream tag = QUICDuplexStream._create(strm, ctx)
+        let ds: QUICDuplexStream tag = QUICDuplexStream._create(strm, ctx, queue)
         @quic_stream_event_context_set_actor(ctx, ds)
         _streams.push(ds)
         let onclose: CloseNotify iso= object iso is CloseNotify
@@ -298,6 +304,7 @@ actor QUICConnection is NotificationEmitter
     else
       cb(Exception("Failed to Open Stream"))
       @quic_free(ctx)
+      @quic_free(queue)
     end
 
   fun ref _receiveNewStream(stream: QUICStream) =>
@@ -473,3 +480,4 @@ actor QUICConnection is NotificationEmitter
     fun _final() =>
       _close()
       @quic_free_connection_event_context(_ctx)
+      @quic_free(_queue)

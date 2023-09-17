@@ -42,13 +42,15 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
   let _stream: Pointer[None] tag
   let _buffer: RingBuffer[U8]
   let _ctx: Pointer[None] tag
+  let _queue: Pointer[None] tag
   var _auto : Bool = false
 
-  new _create(stream: Pointer[None] tag, ctx: Pointer[None] tag) =>
+  new _create(stream: Pointer[None] tag, ctx: Pointer[None] tag, queue: Pointer[None] tag) =>
     _subscribers' = Subscribers(3)
     _buffer = RingBuffer[U8](128000)
     _stream = stream
     _ctx = ctx
+    _queue = queue
 
   fun ref subscribers(): Subscribers=>
     _subscribers'
@@ -66,21 +68,16 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
     Println("Final Stream Block")
     @quic_stream_close_stream(_stream)
     @quic_free(_ctx)
+    @quic_free(_queue)
 
   be _readEventQueue() =>
     try
-      Println("Let see")
-      let event: Pointer[None] tag = @quic_dequeue_event(_ctx, 2)?
-
-      Println("We got the event")
-      Println("something else is happening")
-      //@printStreamEventPointer(event)
-
+      let event: Pointer[None] tag =  @quic_dequeue_event(_queue, 2)?
       match @quic_get_stream_event_type_as_int(event)
         //QUIC_STREAM_EVENT_START_COMPLETE
         | 0 =>
-          @printStreamEventPointer(event)
-          var data': _StreamStartCompleteData = @quic_stream_start_complete_data(event)
+          var data': _StreamStartCompleteData = _StreamStartCompleteData
+          @quic_stream_start_complete_data(event, data')
           var data: StreamStartCompleteData = StreamStartCompleteData(data'.status,
             data'.id,
             data'.peerAccepted == 1)
@@ -109,7 +106,8 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
           _dispatchSendShutdownComplete(data)
         //QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE
         | 7 =>
-          let data': _StreamShutdownCompleteData= @quic_stream_shutdown_complete_data(event)
+          let data': _StreamShutdownCompleteData = _StreamShutdownCompleteData
+          @quic_stream_shutdown_complete_data(event, data')
           let data: StreamShutdownCompleteData = StreamShutdownCompleteData(data'.connectionShutdown == 1,
             data'.appCloseInProgress == 1,
             data'.connectionShutdownByApp == 1,

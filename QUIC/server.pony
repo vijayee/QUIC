@@ -21,12 +21,14 @@ primitive _QUICServerCallback
 primitive NewQUICServer
   fun apply(registration: QUICRegistration, configuration: QUICConfiguration val): QUICServer ?  =>
     let server: QUICServer = QUICServer._create(registration, configuration)
-    let ctx = @quic_new_server_event_context(server, addressof _QUICServerCallback.apply)
+    let queue: Pointer[None] tag = @quic_new_event_queue()
+    let ctx: Pointer[None] tag = @quic_new_server_event_context(server, addressof _QUICServerCallback.apply, queue)
     try
       let listener = @quic_server_listener_open(registration.registration, ctx)?
-      server._initialize(ctx, listener)
+      server._initialize(ctx, listener, queue)
     else
       @quic_free(ctx)
+      @quic_free(queue)
       error
     end
     server
@@ -38,6 +40,7 @@ actor QUICServer is NotificationEmitter
   var _listener: Pointer[None] tag
   let _connections: Array[QUICConnection]
   var _ctx: Pointer[None] tag
+  var _queue: Pointer[None] tag
   var _isClosed: Bool = true
 
   new _create(registration: QUICRegistration, configuration: QUICConfiguration val) =>
@@ -47,11 +50,13 @@ actor QUICServer is NotificationEmitter
     _registration = registration
     _listener = Pointer[None]
     _ctx = Pointer[None]
+    _queue = Pointer[None]
 
-  be _initialize(ctx: Pointer[None] tag, listener: Pointer[None] tag) =>
+  be _initialize(ctx: Pointer[None] tag, listener: Pointer[None] tag, queue: Pointer[None] tag) =>
     _isClosed = false
     _ctx = ctx
     _listener = listener
+    _queue = queue
 
   fun ref subscribers(): Subscribers =>
     _subscribers
@@ -114,12 +119,13 @@ actor QUICServer is NotificationEmitter
 
   be _readEventQueue() =>
     try
-      let event: Pointer[None] tag = @quic_dequeue_event(_ctx, 1)?
+      let event: Pointer[None] tag = @quic_dequeue_event(_queue, 0)?
       match @quic_server_event_type_as_int(event)
         | 0  =>
           let conn: Pointer[None] tag = @quic_receive_connection(event)
-          let connectionCtx: Pointer[None] tag = @quic_new_connection_event_context(0, Pointer[None])
-          let connection: QUICConnection = QUICConnection._serverConnection(conn, connectionCtx)
+          let queue = @quic_new_event_queue()
+          let connectionCtx: Pointer[None] tag = @quic_new_connection_event_context(0, Pointer[None], queue)
+          let connection: QUICConnection = QUICConnection._serverConnection(conn, connectionCtx, queue)
           @quic_connection_event_context_set_actor(connectionCtx, connection)
 
           @quic_connection_set_callback(conn, addressof _QUICConnectionCallback.apply, connectionCtx)

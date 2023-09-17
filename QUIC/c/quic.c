@@ -10,6 +10,7 @@
   #include <netdb.h>
 #endif
 #include <msquic.h>
+#include <unistd.h>
 
 
 
@@ -27,7 +28,7 @@
   }
   void platform_lock_destroy(CRITICAL_SECTION lock) {
     DeleteCriticalSection(&lock, NULL);
-  }f
+  }
   CRITICAL_SECTION MSQuicLock;
 #else
   void platform_lock(pthread_mutex_t lock) {
@@ -307,7 +308,7 @@ int quic_server_event_type_as_int(QUIC_LISTENER_EVENT* event) {
 HQUIC quic_server_listner_open(HQUIC registration, void* serverListenerCallback, quic_server_event_context* ctx) {
   HQUIC listener = NULL;
 
-  if (QUIC_FAILED(MSQuic->ListenerOpen(registration, serverListenerCallback, ctx, listener))) {
+  if (QUIC_FAILED(MSQuic->ListenerOpen(registration, serverListenerCallback, ctx, &listener))) {
     pony_error();
     return NULL;
   }
@@ -320,7 +321,7 @@ void quic_server_listener_close(HQUIC listener) {
 }
 
 HQUIC quic_receive_connection(QUIC_LISTENER_EVENT* event) {
-  return &event->NEW_CONNECTION.Connection;
+  return event->NEW_CONNECTION.Connection;
 }
 
 uint32_t quic_connection_set_configuration(HQUIC connection, HQUIC* configuration) {
@@ -363,7 +364,7 @@ int serverCb(HQUIC listener, void* context, QUIC_LISTENER_EVENT* event) {
       evt->STOP_COMPLETE.RESERVED = event->STOP_COMPLETE.RESERVED;
       break;
   }
-  quic_enqueue_event(&ctx->events, evt, QUIC_LISTENER_EVENTS);
+  quic_enqueue_event(ctx->events, evt, QUIC_LISTENER_EVENTS);
   void (*cb)(void*) = (void (*)(void*)) ctx->cb;
   (*cb)(ctx);
   return 0;
@@ -372,13 +373,13 @@ int serverCb(HQUIC listener, void* context, QUIC_LISTENER_EVENT* event) {
 void quic_server_free_event(QUIC_LISTENER_EVENT* event) {
   switch (event->Type) {
     case QUIC_LISTENER_EVENT_NEW_CONNECTION:
-      free(event->NEW_CONNECTION.Info);
-      free(event->NEW_CONNECTION.Info->LocalAddress);
-      free(event->NEW_CONNECTION.Info->RemoteAddress);
-      free(event->NEW_CONNECTION.Info->CryptoBuffer);
-      free(event->NEW_CONNECTION.Info->ClientAlpnList);
-      free(event->NEW_CONNECTION.Info->NegotiatedAlpn);
-      free(event->NEW_CONNECTION.Info->ServerName);
+      free((void*) event->NEW_CONNECTION.Info);
+      free((void*)event->NEW_CONNECTION.Info->LocalAddress);
+      free((void*)event->NEW_CONNECTION.Info->RemoteAddress);
+      free((void*)event->NEW_CONNECTION.Info->CryptoBuffer);
+      free((void*)event->NEW_CONNECTION.Info->ClientAlpnList);
+      free((void*)event->NEW_CONNECTION.Info->NegotiatedAlpn);
+      free((void*)event->NEW_CONNECTION.Info->ServerName);
       break;
     case QUIC_LISTENER_EVENT_STOP_COMPLETE:
       free(event);
@@ -389,7 +390,7 @@ void quic_server_free_event(QUIC_LISTENER_EVENT* event) {
 HQUIC quic_server_listener_open(HQUIC registration, quic_server_event_context* ctx) {
   HQUIC listener = NULL;
 
-  if (QUIC_FAILED(MSQuic->ListenerOpen(registration, serverCb, ctx, listener))) {
+  if (QUIC_FAILED(MSQuic->ListenerOpen(registration, (unsigned int (*)(struct QUIC_HANDLE *, void *, struct QUIC_LISTENER_EVENT *)) serverCb, ctx, &listener))) {
     pony_error();
   }
   return listener;
@@ -465,26 +466,21 @@ void quic_connection_set_callback(HQUIC connection, void* connectionCallback, vo
 }
 
 HQUIC quic_receive_stream(QUIC_CONNECTION_EVENT* event) {
-  return &event->PEER_STREAM_STARTED.Stream;
+  return event->PEER_STREAM_STARTED.Stream;
 }
-void printStreamEventPointer(QUIC_STREAM_EVENT* event) {
-  printf("Stream Event pointer: %p\n", event);
-}
-void* transferEvent(QUIC_STREAM_EVENT* event) {
-  return (void *) event;
-}
+
 unsigned int streamCb(HQUIC stream, void* context, QUIC_STREAM_EVENT* event) {
   pony_register_thread();
   quic_stream_event_context* ctx = (quic_stream_event_context*) context;
   QUIC_STREAM_EVENT* evt = calloc(1, sizeof(QUIC_STREAM_EVENT));
   evt->Type = event->Type;
+
   switch (event->Type) {
     case QUIC_STREAM_EVENT_START_COMPLETE:
       evt->START_COMPLETE.Status = event->START_COMPLETE.Status;
       evt->START_COMPLETE.ID = event->START_COMPLETE.ID;
       evt->START_COMPLETE.PeerAccepted = event->START_COMPLETE.PeerAccepted;
       evt->START_COMPLETE.RESERVED = event->START_COMPLETE.RESERVED;
-      printf("Start Complete pointer before enqueue: %p\n", evt);
       break;
     case QUIC_STREAM_EVENT_RECEIVE:
       evt->RECEIVE.AbsoluteOffset = event->RECEIVE.AbsoluteOffset;
@@ -528,53 +524,27 @@ unsigned int streamCb(HQUIC stream, void* context, QUIC_STREAM_EVENT* event) {
     case QUIC_STREAM_EVENT_PEER_ACCEPTED:
       break;
   }
-  quic_enqueue_event(&ctx->events, evt, QUIC_STREAM_EVENTS);
+  quic_enqueue_event(ctx->events, evt, QUIC_STREAM_EVENTS);
   void (*cb)(void*) = (void (*)(void*)) ctx->cb;
   (*cb)(ctx);
   return 0;
 }
+
 void quic_stream_free_event(QUIC_STREAM_EVENT* event) {
-  switch (event->Type) {
-    case QUIC_STREAM_EVENT_START_COMPLETE:
-      free(event);
-      break;
-    case QUIC_STREAM_EVENT_RECEIVE:
-      for (int32_t i = 0; i < event->RECEIVE.BufferCount; i++) {
-        free(event->RECEIVE.Buffers[i].Buffer);
-      }
-      free(event->RECEIVE.Buffers);
-      free(event);
-      break;
-    case QUIC_STREAM_EVENT_SEND_COMPLETE:
-      free(event);
-      break;
-    case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
-      free(event);
-      break;
-    case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
-      free(event);
-      break;
-    case QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED:
-      free(event);
-      break;
-    case QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE:
-      free(event);
-      break;
-    case QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE:
-      free(event);
-      break;
-    case QUIC_STREAM_EVENT_PEER_ACCEPTED:
-      free(event);
-      break;
+  if (event->Type == QUIC_STREAM_EVENT_RECEIVE) {
+    for (int32_t i = 0; i < event->RECEIVE.BufferCount; i++) {
+      free(event->RECEIVE.Buffers[i].Buffer);
+    }
   }
+  free(event);
 }
 
 void quic_stream_set_callback(HQUIC stream, void* ctx) {
   return MSQuic->SetCallbackHandler(stream, streamCb, ctx);
 }
 
-uint32_t quic_receive_stream_type(QUIC_CONNECTION_EVENT* event) {
-  return (uint32_t) event->PEER_STREAM_STARTED.Flags;
+int quic_receive_stream_type(QUIC_CONNECTION_EVENT* event) {
+  return (int) event->PEER_STREAM_STARTED.Flags;
 }
 
 int quic_get_stream_event_type_as_int(QUIC_STREAM_EVENT* event) {
@@ -640,10 +610,11 @@ void quic_stream_get_total_buffer(QUIC_STREAM_EVENT* event, uint8_t* buffer, HQU
   MSQuic->StreamReceiveComplete(stream, offset);
 }
 
-quic_connection_event_context* quic_new_connection_event_context(uint8_t isClient, void * cb) {
+quic_connection_event_context* quic_new_connection_event_context(uint8_t isClient, void * cb, quic_event_queue* queue) {
   quic_connection_event_context* ctx= calloc(1, sizeof(quic_connection_event_context));
   ctx->isClient = isClient;
   ctx->cb= cb;
+  ctx->events = queue;
   ctx->QUIC_CONNECTION_EVENT_CONNECTED = 1;
   ctx->QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED = 1;
   ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT =1;
@@ -693,15 +664,6 @@ void quic_free_connection_event_context(quic_connection_event_context* ctx) {
 void quic_connection_event_context_set_actor(quic_connection_event_context* ctx, void* connectionActor) {
     ctx->connectionActor = connectionActor;
 }
-void printQueue(quic_event_queue* queue) {
-   quic_event_queue_node* node = queue->next;
-   printf("queue: ");
-   while (node != NULL) {
-     printf("%p -> ", node->event);
-     node= node->next;
-   }
-   printf("\n");
-}
 
 void quic_enqueue_event(quic_event_queue* queue, void* event, quic_event_type type) {
   platform_lock(queue->lock);
@@ -712,7 +674,6 @@ void quic_enqueue_event(quic_event_queue* queue, void* event, quic_event_type ty
     node->event = event;
     node->next = NULL;
     queue->next = node;
-    queue->current = node;
     queue->length = 1;
   } else {
     node = queue->next;
@@ -726,70 +687,34 @@ void quic_enqueue_event(quic_event_queue* queue, void* event, quic_event_type ty
     node->event = event;
     queue->length++;
   }
-  /*
-  if (type == QUIC_STREAM_EVENTS){
-    printf("From enqueue %p \n", event);
-    printQueue(queue);
-  }*/
   platform_unlock(queue->lock);
 }
 
-void* quic_dequeue_event(void* context, uint8_t type) {
-  /*
-  if (type == 2) {
-    QUIC_STREAM_EVENT* evt = calloc(1, sizeof(QUIC_STREAM_EVENT));
-    evt->Type = QUIC_STREAM_EVENT_START_COMPLETE;
-    evt->START_COMPLETE.Status = 0;
-    evt->START_COMPLETE.ID = 1;
-    evt->START_COMPLETE.PeerAccepted = 1;
-    evt->START_COMPLETE.RESERVED = 0;
-    return evt;
-  }*/
-  quic_event_queue* queue = NULL;
-  switch(type) {
-    case 0:
-      queue = &(((quic_connection_event_context*)context)->events);
-      break;
-    case 1:
-      queue = &(((quic_server_event_context* )context)->events);
-      break;
-    case 2:
-      queue = &(((quic_stream_event_context*)context)->events);
-      break;
-
-  }
-
+void* quic_dequeue_event(quic_event_queue* queue, uint8_t type) {
   platform_lock(queue->lock);
-
-  if (type == 2) {
-    //printf("Stream Context pointer %p\n", context);
-    printf("From dequeue\n");
-    printQueue(queue);
-  }
   quic_event_queue_node* node= NULL;
   if (queue->next == NULL) {
     pony_error();
-    queue->length = 0;
-    return node;
+    assert(queue->length == 0);
+    platform_unlock(queue->lock);
+    return NULL;
   } else {
-    node = queue->current;
-    queue->current = node->next;
+    node = queue->next;
+    queue->next = node->next;
     queue->length--;
     assert(queue->length >= 0);
   }
   void* event = node->event;
-  //node->event = NULL;
-  //free(node);
-  if (type == 2) {
-    printf("After dequeue\n");
-    printQueue(queue);
-  }
-
+  node->event = NULL;
+  free(node);
   platform_unlock(queue->lock);
-  /*if (type == 2) {
-    printf("Sent Stream Event %p\n", event);
-  }*/
   return event;
+}
+
+quic_event_queue* quic_new_event_queue() {
+  quic_event_queue* queue = calloc(1, sizeof(quic_event_queue));
+  platform_lock_init(queue->lock);
+  return queue;
 }
 unsigned int connectionCb(HQUIC connection, void* context, QUIC_CONNECTION_EVENT* event) {
   pony_register_thread();
@@ -871,65 +796,23 @@ unsigned int connectionCb(HQUIC connection, void* context, QUIC_CONNECTION_EVENT
     case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
       break;
   }
-  quic_enqueue_event(&ctx->events, evt, QUIC_CONNECTION_EVENTS);
+  quic_enqueue_event(ctx->events, evt, QUIC_CONNECTION_EVENTS);
   void (*cb)(void*) = (void (*)(void*)) ctx->cb;
   (*cb)(ctx);
   return 0;
 }
 
 void quic_connection_free_event(QUIC_CONNECTION_EVENT* event) {
-  switch(event->Type) {
-    case QUIC_CONNECTION_EVENT_CONNECTED:
-      free(event->CONNECTED.NegotiatedAlpn);
-      break;
-    case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
-      free(event);
-      break;
-    case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
-      free(event);
-      break;
-    case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
-      free(event);
-      break;
-    case QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED:
-      free(event->LOCAL_ADDRESS_CHANGED.Address);
-      break;
-    case QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED:
-      free(event->PEER_ADDRESS_CHANGED.Address);
-      break;
-    case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
-      free(event);
-      break;
-    case QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE:
-      free(event);
-      break;
-    case QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS:
-      free(event);
-      break;
-    case QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED:
-      free(event);
-      break;
-    case QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED:
-      free(event);
-      break;
-    case QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED:
-      free(event->DATAGRAM_RECEIVED.Buffer);
-      free(event);
-      break;
-    case QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED:
-      free(event);
-      break;
-    case QUIC_CONNECTION_EVENT_RESUMED:
-      free(event->RESUMED.ResumptionState);
-      free(event);
-      break;
-    case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
-      free(event);
-      break;
-    case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
-      free(event);
-      break;
+  if (event->Type == QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED) {
+    free((void*)event->LOCAL_ADDRESS_CHANGED.Address);
   }
+  if (event->Type == QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED) {
+    free((void*)event->DATAGRAM_RECEIVED.Buffer);
+  }
+  if (event->Type == QUIC_CONNECTION_EVENT_RESUMED) {
+    free((void*)event->RESUMED.ResumptionState);
+  }
+  free((void*)event);
 }
 
 HQUIC quic_connection_open(HQUIC registration, void* callback, quic_connection_event_context* ctx) {
@@ -941,10 +824,11 @@ HQUIC quic_connection_open(HQUIC registration, void* callback, quic_connection_e
    return connection;
 }
 
-quic_server_event_context* quic_new_server_event_context(void* serverActor, void* cb) {
+quic_server_event_context* quic_new_server_event_context(void* serverActor, void* cb, quic_event_queue* queue) {
   quic_server_event_context* ctx = calloc(1, sizeof(quic_server_event_context));
   ctx->serverActor = serverActor;
   ctx->cb = cb;
+  ctx->events = queue;
   return ctx;
 }
 
@@ -1230,9 +1114,10 @@ void quic_connection_event_resumption_ticket_received_resumption_ticket(QUIC_CON
   memcpy(buffer, event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket, (size_t) event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
 }
 
-quic_stream_event_context * quic_stream_new_event_context(void* cb) {
+quic_stream_event_context * quic_stream_new_event_context(void* cb, quic_event_queue* queue) {
   quic_stream_event_context * ctx = calloc(1, sizeof(quic_stream_event_context));
   ctx->cb = cb;
+  ctx->events = queue;
   return ctx;
 }
 
@@ -1244,43 +1129,38 @@ void* quic_stream_actor(quic_stream_event_context* ctx) {
   return ctx->streamActor;
 }
 
-struct stream_start_complete_data quic_stream_start_complete_data(QUIC_STREAM_EVENT * event) {
-  printf("Start Complete pointer: %p\n", event);
-  struct stream_start_complete_data data;
-  data.status = (uint32_t) event->START_COMPLETE.Status;
-  data.id = event->START_COMPLETE.ID;
-  data.peerAccepted = (uint8_t) event->START_COMPLETE.PeerAccepted;
-  return data;
+void quic_stream_start_complete_data(QUIC_STREAM_EVENT* event, struct stream_start_complete_data* data) {
+  data->status = (uint32_t) event->START_COMPLETE.Status;
+  data->id = event->START_COMPLETE.ID;
+  data->peerAccepted = (uint8_t) event->START_COMPLETE.PeerAccepted;
 }
 
-uint8_t quic_stream_event_send_complete_canceled(QUIC_STREAM_EVENT * event) {
+uint8_t quic_stream_event_send_complete_canceled(QUIC_STREAM_EVENT* event) {
   return (uint8_t) event->SEND_COMPLETE.Canceled;
 }
 
-uint64_t quic_stream_event_peer_send_aborted_error_code(QUIC_STREAM_EVENT * event) {
+uint64_t quic_stream_event_peer_send_aborted_error_code(QUIC_STREAM_EVENT* event) {
   return event->PEER_SEND_ABORTED.ErrorCode;
 }
 
-uint64_t quic_stream_event_peer_receive_aborted_error_code(QUIC_STREAM_EVENT * event) {
+uint64_t quic_stream_event_peer_receive_aborted_error_code(QUIC_STREAM_EVENT* event) {
   return event->PEER_RECEIVE_ABORTED.ErrorCode;
 }
 
-uint8_t quic_stream_event_send_shutdown_complete_graceful(QUIC_STREAM_EVENT * event) {
+uint8_t quic_stream_event_send_shutdown_complete_graceful(QUIC_STREAM_EVENT* event) {
   return (uint8_t) event->SEND_SHUTDOWN_COMPLETE.Graceful;
 }
 
-struct stream_shutdown_complete_data quic_stream_shutdown_complete_data(QUIC_STREAM_EVENT * event) {
-  struct stream_shutdown_complete_data data;
-  data.connectionShutdown = event->SHUTDOWN_COMPLETE.ConnectionShutdown;
-  data.appCloseInProgress = event->SHUTDOWN_COMPLETE.AppCloseInProgress;
-  data.connectionShutdownByApp = (uint8_t) event->SHUTDOWN_COMPLETE.ConnectionShutdownByApp;
-  data.connectionClosedRemotely = (uint8_t) event->SHUTDOWN_COMPLETE.ConnectionClosedRemotely;
-  data.connectionErrorCode = (uint8_t) event->SHUTDOWN_COMPLETE.ConnectionErrorCode;
-  data.connectionCloseStatus = (uint8_t) event->SHUTDOWN_COMPLETE.ConnectionCloseStatus;
-  return data;
+void quic_stream_shutdown_complete_data(QUIC_STREAM_EVENT* event, struct stream_shutdown_complete_data* data) {
+  data->connectionShutdown = event->SHUTDOWN_COMPLETE.ConnectionShutdown;
+  data->appCloseInProgress = event->SHUTDOWN_COMPLETE.AppCloseInProgress;
+  data->connectionShutdownByApp = (uint8_t) event->SHUTDOWN_COMPLETE.ConnectionShutdownByApp;
+  data->connectionClosedRemotely = (uint8_t) event->SHUTDOWN_COMPLETE.ConnectionClosedRemotely;
+  data->connectionErrorCode = (uint8_t) event->SHUTDOWN_COMPLETE.ConnectionErrorCode;
+  data->connectionCloseStatus = (uint8_t) event->SHUTDOWN_COMPLETE.ConnectionCloseStatus;
 }
 
-uint64_t quic_stream_event_ideal_send_buffer_size_byte_count(QUIC_STREAM_EVENT * event) {
+uint64_t quic_stream_event_ideal_send_buffer_size_byte_count(QUIC_STREAM_EVENT* event) {
   return event->IDEAL_SEND_BUFFER_SIZE.ByteCount;
 }
 
@@ -1413,4 +1293,8 @@ void quic_configuration_close(HQUIC* configuration) {
 }
 uint8_t quic_connection_is_client(quic_connection_event_context* ctx) {
   return ctx->isClient;
+}
+
+void arbitrary_sleep() {
+  sleep(2);
 }

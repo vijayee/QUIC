@@ -6,6 +6,7 @@ PONYINCPATH =/home/victor/.local/share/ponyup/ponyc-release-0.51.3-x86_64-linux-
 PONYLIBPATH=/home/victor/.local/share/ponyup/ponyc-release-0.51.3-x86_64-linux-gnu/lib/x86-64
 ALTLIBPATH=/home/victor/Workspace/src/github.com/vijayee/ponyc/src/libponyrt/sched
 DEBUGPONYC=/home/victor/Workspace/src/github.com/vijayee/ponyc/build/debug/ponyc
+THREADSANITIZERPONY=/home/victor/Workspace/src/github.com/vijayee/ponyc/build/release-thread_sanitizer/ponyc
 build:
 	mkdir -p build
 	mkdir -p build/lib
@@ -17,6 +18,11 @@ libponyquic: build
 	rm build/lib/*.o
 libponyquicAS: build
 	clang -g -fsanitize=address -v -fPIC -O3 -o build/lib/quic.o -c QUIC/c/quic.c -L$(MSQUICLIBPATH) -I$(PONYINCPATH) -I$(MSINCQUICPATH) -lponyrt -lmsquic #-I$(OPENSSLINCPATH)
+	#cd build/lib && ar -x  $(MSQUICLIBPATH)/libmsquic.a # && ar -x  $(OPENSSLPATH)/libcrypto.a
+	ar rcs build/lib/libponyquic.a build/lib/*.o
+	rm build/lib/*.o
+libponyquicTS: build
+	clang -g -fsanitize=thread -v -fPIC -O3 -o build/lib/quic.o -c QUIC/c/quic.c -L$(MSQUICLIBPATH) -I$(PONYINCPATH) -I$(MSINCQUICPATH) -lponyrt -lmsquic #-I$(OPENSSLINCPATH)
 	#cd build/lib && ar -x  $(MSQUICLIBPATH)/libmsquic.a # && ar -x  $(OPENSSLPATH)/libcrypto.a
 	ar rcs build/lib/libponyquic.a build/lib/*.o
 	rm build/lib/*.o
@@ -43,7 +49,18 @@ test/network/client/debug: libponyquic
 	#corral fetch
 	corral run -- $(DEBUGPONYC)  QUIC/test/network/client -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
 	lldb ./build/test/client
-
+test/network/client/valgrind: libponyquic
+	#corral fetch
+	corral run -- $(DEBUGPONYC)  QUIC/test/network/client -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
+	valgrind --leak-check=yes ./build/test/client
+test/network/client/threadsanitizer: libponyquicTS
+	#corral fetch
+	corral run -- $(THREADSANITIZERPONY)  QUIC/test/network/client -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
+	./build/test/client
+test/network/client/addresssanitizer: libponyquicAS
+	#corral fetch
+	corral run -- $(DEBUGPONYC)  QUIC/test/network/client -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
+	./build/test/client
 test/network/server/debug: libponyquic
 	#corral fetch
 	corral run -- $(DEBUGPONYC)  QUIC/test/network/server -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
