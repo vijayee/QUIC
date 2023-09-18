@@ -548,7 +548,6 @@ int quic_receive_stream_type(QUIC_CONNECTION_EVENT* event) {
 }
 
 int quic_get_stream_event_type_as_int(QUIC_STREAM_EVENT* event) {
-  /*
   switch (event->Type) {
     case QUIC_STREAM_EVENT_START_COMPLETE:
       printf("QUIC_STREAM_EVENT_START_COMPLETE\n");
@@ -577,7 +576,10 @@ int quic_get_stream_event_type_as_int(QUIC_STREAM_EVENT* event) {
     case QUIC_STREAM_EVENT_PEER_ACCEPTED:
       printf("QUIC_STREAM_EVENT_PEER_ACCEPTED\n");
       break;
-  }*/
+    case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
+      printf("QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE\n");
+      break;
+  }
   return (int) event->Type;
 }
 
