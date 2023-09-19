@@ -84,7 +84,7 @@ type QUICStatus is (QuicStatusSuccess | QuicStatusPending | QuicStatusContinue |
   QuicStatusUnknownCertificate | QuicStatusRequiredCertificate | QuicStatusCertExpired | QuicStatusCertUntrustedRoot | QuicStatusCertNoCert)
 
 primitive QUICStatusFromCode
-  fun apply(code: U64): (QUICStatus | None) =>
+  fun apply(code: U64): QUICStatus ? =>
     match code
       | 0 => QuicStatusSuccess
       | -2 => QuicStatusPending
@@ -93,25 +93,40 @@ primitive QUICStatusFromCode
       | 22 => QuicStatusInvalidParameter
       | 1 => QuicStatusInvalidState
       | 95 => QuicStatusNotSupported
+      | 102 => QuicStatusNotSupported
       | 2 =>  QuicStatusNotFound
       | 75 =>  QuicStatusBufferTooSmall
+      | 84 => QuicStatusBufferTooSmall
       | 103 => QuicStatusHandshakeFailure
+      | 53 => QuicStatusHandshakeFailure
       | 125 => QuicStatusAborted
+      | 89 => QuicStatusAborted
       | 98 => QuicStatusAddressInUse
+      | 48 => QuicStatusAddressInUse
       | 97 => QuicStatusInvalidAddress
+      | 47 => QuicStatusInvalidAddress
       | 110 => QuicStatusConnectionTimeout
+      | 60 => QuicStatusConnectionTimeout
       | 62 => QuicStatusConnectionIdle
+      | 101 => QuicStatusConnectionIdle
       | 5 => QuicStatusInternalError
       | 111 => QuicStatusConnectionRefused
+      | 61 => QuicStatusConnectionRefused
       | 71 => QuicStatusProtocolError
+      | 100 => QuicStatusProtocolError
       | 93 => QuicStatusVerNegError
+      | 43 => QuicStatusVerNegError
       | 113 => QuicStatusUnreachable
       | 126 => QuicStatusTLSError
       | 130 => QuicStatusUserCanceled
-      | 91 => QuicStatusALPNNegFailure
+      | 105 => QuicStatusUserCanceled
+      | 92 => QuicStatusALPNNegFailure
+      | 42 => QuicStatusALPNNegFailure
       | 86 => QuicStatusStreamLimitReached
       | 91 => QuicStatusALPNInUse
+      | 41 => QuicStatusALPNInUse
       | 99 => QuicStatusAddressNotAvailable
+      | 47 => QuicStatusAddressNotAvailable  
       | 0xBEBC300 => QuicStatusCloseNotify
       | 0xBEBC32A => QuicStatusBadCertificate
       | 0xBEBC32B => QuicStatusRevokedCertificate
@@ -122,4 +137,6 @@ primitive QUICStatusFromCode
       | 0xBEBC401 => QuicStatusCertExpired
       | 0xBEBC402 => QuicStatusCertUntrustedRoot
       | 0xBEBC403 => QuicStatusCertNoCert
+      else
+        error
     end
