@@ -20,12 +20,12 @@ primitive _QUICServerCallback
 
 primitive NewQUICServer
   fun apply(registration: QUICRegistration, configuration: QUICConfiguration val): QUICServer ?  =>
-    let server: QUICServer = QUICServer._create(registration, configuration)
     let queue: Pointer[None] tag = @quic_new_event_queue()
+    let server: QUICServer = QUICServer._create(registration, configuration, queue)
     let ctx: Pointer[None] tag = @quic_new_server_event_context(server, addressof _QUICServerCallback.apply, queue)
     try
       let listener = @quic_server_listener_open(registration.registration, ctx)?
-      server._initialize(ctx, listener, queue)
+      server._initialize(ctx, listener)
     else
       @quic_free(ctx)
       @quic_free(queue)
@@ -43,20 +43,19 @@ actor QUICServer is NotificationEmitter
   var _queue: Pointer[None] tag
   var _isClosed: Bool = true
 
-  new _create(registration: QUICRegistration, configuration: QUICConfiguration val) =>
+  new _create(registration: QUICRegistration, configuration: QUICConfiguration val, queue: Pointer[None] tag) =>
     _subscribers = Subscribers
     _connections = Array[QUICConnection](10)
     _configuration = configuration
     _registration = registration
     _listener = Pointer[None]
     _ctx = Pointer[None]
-    _queue = Pointer[None]
+    _queue = queue
 
-  be _initialize(ctx: Pointer[None] tag, listener: Pointer[None] tag, queue: Pointer[None] tag) =>
+  be _initialize(ctx: Pointer[None] tag, listener: Pointer[None] tag) =>
     _isClosed = false
     _ctx = ctx
     _listener = listener
-    _queue = queue
 
   fun ref subscribers(): Subscribers =>
     _subscribers
@@ -138,6 +137,9 @@ actor QUICServer is NotificationEmitter
         return
       end
       @quic_server_free_event(event)
+    else
+      notifyError(Exception("Server Queue Empty"))
+      close()
     end
 
   fun _final() =>

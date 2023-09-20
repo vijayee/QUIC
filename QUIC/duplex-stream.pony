@@ -124,6 +124,9 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
           _dispatchPeerAccepted()
       end
       @quic_stream_free_event(event)
+    else
+      notifyError(Exception("Stream Queue Empty"))
+      close()
     end
 
   fun ref _receive(event: Pointer[None] tag) =>

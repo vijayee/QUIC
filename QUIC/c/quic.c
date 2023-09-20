@@ -669,52 +669,32 @@ void quic_connection_event_context_set_actor(quic_connection_event_context* ctx,
 
 void quic_enqueue_event(quic_event_queue* queue, void* event, quic_event_type type) {
   platform_lock(queue->lock);
-  quic_event_queue_node* node = NULL;
-  if (queue->next == NULL) {
-    node = calloc(1, sizeof(quic_event_queue_node));
-    node->type = type;
-    node->event = event;
-    node->next = NULL;
-    queue->next = node;
-    queue->length = 1;
-  } else {
-    node = queue->next;
-    while (node->next!= NULL) {
-      node = node->next;
-    }
-    node->next = calloc(1, sizeof(quic_event_queue_node));
-    node= node->next;
-    node->type = type;
-    node->next = NULL;
-    node->event = event;
-    queue->length++;
-  }
+  quic_event_queue_node* node = calloc(1, sizeof(quic_event_queue_node));
+  node->event= event;
+  TAILQ_INSERT_TAIL(&queue->next, node, next);
   platform_unlock(queue->lock);
 }
 
 void* quic_dequeue_event(quic_event_queue* queue, uint8_t type) {
   platform_lock(queue->lock);
-  quic_event_queue_node* node= NULL;
-  if (queue->next == NULL) {
+  if (TAILQ_EMPTY(&queue->next)) {
     pony_error();
-    assert(queue->length == 0);
     platform_unlock(queue->lock);
     return NULL;
   } else {
-    node = queue->next;
-    queue->next = node->next;
-    queue->length--;
-    assert(queue->length >= 0);
+    quic_event_queue_node* node= TAILQ_FIRST(&queue->next);
+    TAILQ_REMOVE(&queue->next, node, next);
+    platform_unlock(queue->lock);
+    void* event = node->event;
+    node->event = NULL;
+    free(node);
+    return event;
   }
-  void* event = node->event;
-  node->event = NULL;
-  free(node);
-  platform_unlock(queue->lock);
-  return event;
 }
 
 quic_event_queue* quic_new_event_queue() {
   quic_event_queue* queue = calloc(1, sizeof(quic_event_queue));
+  TAILQ_INIT(&queue->next);
   platform_lock_init(queue->lock);
   return queue;
 }

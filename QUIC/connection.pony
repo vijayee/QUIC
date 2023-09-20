@@ -53,10 +53,10 @@ primitive NewQUICConnection
     let queue: Pointer[None] tag = @quic_new_event_queue()
     let ctx = @quic_new_connection_event_context(1, addressof _QUICConnectionCallback.apply, queue)
     try
-      let connection = QUICConnection._create(configuration)
+      let connection = QUICConnection._create(configuration, queue)
       @quic_connection_event_context_set_actor(ctx, connection)
       let conn = @quic_connection_open(registration.registration, addressof _QUICConnectionCallback.apply, ctx)?
-      connection._initialize(ctx, conn, queue)
+      connection._initialize(ctx, conn)
       connection
     else
       @quic_free(queue)
@@ -75,11 +75,11 @@ actor QUICConnection is NotificationEmitter
   var _queue: Pointer[None] tag
 
 
-  new _create(configuration: QUICConfiguration val) =>
+  new _create(configuration: QUICConfiguration val, queue: Pointer[None] tag) =>
     _configuration = configuration
     _streams = Array[QUICStream](3)
     _ctx = Pointer[None]
-    _queue = Pointer[None]
+    _queue = queue
     _subscribers = Subscribers
     _connection = Pointer[None]
 
@@ -236,13 +236,15 @@ actor QUICConnection is NotificationEmitter
           _dispatchPeerCertificateReceived()
       end
       @quic_connection_free_event(event)
+    else
+      notifyError(Exception("Connection Queue Empty"))
+      close()
     end
 
-  be _initialize(ctx: Pointer[None] tag, connection: Pointer[None] tag, queue: Pointer[None] tag) =>
+  be _initialize(ctx: Pointer[None] tag, connection: Pointer[None] tag) =>
     _invalid = false
     _ctx = ctx
     _connection = connection
-    _queue = queue
 
   be start( ip: String, port: U16, family: QUICAddressFamily = Unspecified, resumptionTicket: (Array[U8] val | None) = None) =>
     if not _started then
@@ -477,6 +479,8 @@ actor QUICConnection is NotificationEmitter
 
     be close() => None
       _close()
+      _dispatchClose()
+
     fun _final() =>
       _close()
       @quic_free_connection_event_context(_ctx)

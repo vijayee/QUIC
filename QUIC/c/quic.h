@@ -1,4 +1,5 @@
 #include <msquic.h>
+#include "queue.h"
 #if __linux__
   #include <pthread.h>
 #endif
@@ -85,9 +86,11 @@ struct quic_event_queue_node;
 typedef struct quic_event_queue_node quic_event_queue_node;
 struct quic_event_queue_node {
   quic_event_type type;
-  quic_event_queue_node* next;
+  TAILQ_ENTRY(quic_event_queue_node) next;
   void* event;
 };
+TAILQ_HEAD(QUEUE_START, quic_event_queue_node);
+typedef struct QUEUE_START queue_start;
 typedef struct {
    #if __linux__
      pthread_mutex_t lock;
@@ -95,8 +98,8 @@ typedef struct {
    #if _WIN32
      CRITICAL_SECTION lock;
    #endif
-   quic_event_queue_node* next;
-   size_t length;
+   queue_start next;
+   int length;
 } quic_event_queue;
 
 quic_event_queue* quic_new_event_queue();

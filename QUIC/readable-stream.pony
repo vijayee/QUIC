@@ -80,6 +80,9 @@ actor QUICReadableStream is ReadablePushStream[Array[U8] iso]
           _dispatchPeerAccepted()
       end
       @quic_stream_free_event(event)
+    else
+      notifyError(Exception("Stream Queue Empty"))
+      close()
     end
 
   fun readable(): Bool =>
