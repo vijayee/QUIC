@@ -44,6 +44,7 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
   let _ctx: Pointer[None] tag
   let _queue: Pointer[None] tag
   var _auto : Bool = false
+  var _isShutdown: Bool = false
 
   new _create(stream: Pointer[None] tag, ctx: Pointer[None] tag, queue: Pointer[None] tag) =>
     _subscribers' = Subscribers(3)
@@ -66,7 +67,9 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
 
   fun _final() =>
     Println("Final Stream Block")
-    @quic_stream_close_stream(_stream)
+    if not _isShutdown then
+      @quic_stream_close_stream(_stream)
+    end
     @quic_free(_ctx)
     @quic_free(_queue)
 
@@ -104,6 +107,7 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
         | 6 =>
           let data: SendShutdownCompleteData = SendShutdownCompleteData(@quic_stream_event_send_shutdown_complete_graceful(event) == 1)
           _dispatchSendShutdownComplete(data)
+          _isShutdown = true
         //QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE
         | 7 =>
           let data': _StreamShutdownCompleteData = _StreamShutdownCompleteData

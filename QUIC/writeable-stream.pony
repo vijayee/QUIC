@@ -7,6 +7,7 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
   var _ctx: Pointer[None] tag
   let _stream: Pointer[None] tag
   let _queue: Pointer[None] tag
+  var _isShutdown: Bool = false
 
   new _create(stream: Pointer[None] tag, ctx: Pointer[None] tag, queue: Pointer[None] tag) =>
     _stream = stream
@@ -21,7 +22,9 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
     _isDestroyed
 
   fun _final() =>
-    @quic_stream_close_stream(_stream)
+    if not _isShutdown then
+      @quic_stream_close_stream(_stream)
+    end
     @quic_free(_ctx)
     @quic_free(_queue)
 
@@ -70,6 +73,7 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
             data'.connectionErrorCode,
             data'.connectionCloseStatus)
           _dispatchStreamShutdownComplete(data)
+          _isShutdown = true
         //QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE
         | 8 =>
           let data: IdealSendBufferSizeData = IdealSendBufferSizeData(@quic_stream_event_ideal_send_buffer_size_byte_count(event))
