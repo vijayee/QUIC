@@ -1,7 +1,7 @@
 use "Streams"
 use "Exception"
 
-actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
+actor QUICWriteableStream is WriteablePushStream[Array[U8] val]
   var _isDestroyed: Bool = false
   let _subscribers': Subscribers
   var _ctx: Pointer[None] tag
@@ -119,40 +119,39 @@ actor QUICWriteableStream is WriteablePushStream[Array[U8] iso]
   be _dispatchPeerAccepted() =>
     notify(PeerAcceptedEvent)
 
-  be write(data: Array[U8] iso) =>
+  be write(data: Array[U8] val) =>
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
     else
-      let data': Array[U8] = consume data
       try
-        @quic_stream_send(_stream, data'.cpointer(), data'.size())?
+        @quic_stream_send(_stream, data.cpointer(), data.size())?
       else
         notifyError(Exception("Failed to write data"))
       end
     end
 
-  be piped(stream: ReadablePushStream[Array[U8] iso] tag) =>
+  be piped(stream: ReadablePushStream[Array[U8] val] tag) =>
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
     else
-      let dataNotify: DataNotify[Array[U8] iso] iso = object iso is DataNotify[Array[U8] iso]
-        let _stream: WriteablePushStream[Array[U8] iso] tag = this
-        fun ref apply(data': Array[U8] iso) =>
+      let dataNotify: DataNotify[Array[U8] val] iso = object iso is DataNotify[Array[U8] val]
+        let _stream: WriteablePushStream[Array[U8] val] tag = this
+        fun ref apply(data': Array[U8] val) =>
           _stream.write(consume data')
       end
       stream.subscribe(consume dataNotify)
       let errorNotify: ErrorNotify iso = object iso is ErrorNotify
-        let _stream: WriteablePushStream[Array[U8] iso] tag = this
+        let _stream: WriteablePushStream[Array[U8] val] tag = this
         fun ref apply(ex: Exception) => _stream.destroy(ex)
       end
       stream.subscribe(consume errorNotify)
       let completeNotify: CompleteNotify iso = object iso is CompleteNotify
-        let _stream: WriteablePushStream[Array[U8] iso] tag = this
+        let _stream: WriteablePushStream[Array[U8] val] tag = this
         fun ref apply() => _stream.close()
       end
       stream.subscribe(consume completeNotify)
       let closeNotify: CloseNotify iso = object iso  is CloseNotify
-        let _stream: WriteablePushStream[Array[U8] iso] tag = this
+        let _stream: WriteablePushStream[Array[U8] val] tag = this
         fun ref apply () =>
           _stream.close()
       end

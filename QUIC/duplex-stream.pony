@@ -32,7 +32,7 @@ primitive _QUICStreamCallback
     stream._readEventQueue()
 
 
-actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
+actor QUICDuplexStream is TransformPushStream[Array[U8] iso, Array[U8] val]
   var _readable: Bool = true
   var _writeable: Bool = true
   var _isDestroyed: Bool = false
@@ -238,15 +238,14 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
       end
     end
 
-  be write(data: Array[U8] iso) =>
+  be write(data: Array[U8] val) =>
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
     elseif not _writeable then
       notifyError(Exception("Stream is closed for writing"))
     else
-      let data': Array[U8] = consume data
       try
-        @quic_stream_send(_stream, data'.cpointer(), data'.size())?
+        @quic_stream_send(_stream, data.cpointer(), data.size())?
       else
         notifyError(Exception("Failed to write data"))
       end
@@ -297,28 +296,28 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
   fun ref pipeNotifiers(): (Array[Notify tag] iso^ | None) =>
     _pipeNotifiers' = None
 
-  be piped(stream: ReadablePushStream[Array[U8] iso] tag) =>
+  be piped(stream: ReadablePushStream[Array[U8] val] tag) =>
     if destroyed() then
       notifyError(Exception("Stream has been destroyed"))
     else
-      let dataNotify: DataNotify[Array[U8] iso] iso = object iso is DataNotify[Array[U8] iso]
-        let _stream: DuplexPushStream[Array[U8] iso] tag = this
-        fun ref apply(data': Array[U8] iso) =>
+      let dataNotify: DataNotify[Array[U8] val] iso = object iso is DataNotify[Array[U8] val]
+        let _stream: TransformPushStream[Array[U8] iso, Array[U8] val] tag = this
+        fun ref apply(data': Array[U8] val) =>
           _stream.write(consume data')
       end
       stream.subscribe(consume dataNotify)
       let errorNotify: ErrorNotify iso = object iso is ErrorNotify
-        let _stream: DuplexPushStream[Array[U8] iso] tag = this
+        let _stream: TransformPushStream[Array[U8] iso, Array[U8] val] tag = this
         fun ref apply(ex: Exception) => _stream.destroy(ex)
       end
       stream.subscribe(consume errorNotify)
       let completeNotify: CompleteNotify iso = object iso is CompleteNotify
-        let _stream: DuplexPushStream[Array[U8] iso] tag = this
+        let _stream: TransformPushStream[Array[U8] iso, Array[U8] val] tag = this
         fun ref apply() => _stream.close()
       end
       stream.subscribe(consume completeNotify)
       let closeNotify: CloseNotify iso = object iso  is CloseNotify
-        let _stream: DuplexPushStream[Array[U8] iso] tag = this
+        let _stream: TransformPushStream[Array[U8] iso, Array[U8] val] tag = this
         fun ref apply () => _stream.close()
       end
       let closeNotify': CloseNotify tag = closeNotify
@@ -338,7 +337,7 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
       end
 
       let pipedNotify: PipedNotify iso =  object iso is PipedNotify
-        let _stream: DuplexPushStream[Array[U8] iso] tag = this
+        let _stream: TransformPushStream[Array[U8] iso, Array[U8] val] tag = this
         fun ref apply() =>
           _stream.push()
       end
@@ -347,7 +346,7 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
       stream.subscribe(consume pipedNotify)
 
       let errorNotify: ErrorNotify iso = object iso  is ErrorNotify
-        let _stream: DuplexPushStream[Array[U8] iso] tag = this
+        let _stream: TransformPushStream[Array[U8] iso, Array[U8] val] tag = this
         fun ref apply (ex: Exception) => _stream.destroy(ex)
       end
       let errorNotify': ErrorNotify tag = errorNotify
@@ -355,7 +354,7 @@ actor QUICDuplexStream is DuplexPushStream[Array[U8] iso]
       stream.subscribe(consume errorNotify)
 
       let closeNotify: CloseNotify iso = object iso  is CloseNotify
-        let _stream: DuplexPushStream[Array[U8] iso] tag = this
+        let _stream: TransformPushStream[Array[U8] iso, Array[U8] val] tag = this
         fun ref apply () => _stream.close()
       end
       let closeNotify': CloseNotify tag = closeNotify

@@ -41,6 +41,10 @@ test/network/server: libponyquic
 	#corral fetch
 	corral run -- ponyc  QUIC/test/network/server -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
 	./build/test/server
+test/network/server/debug: libponyquic
+	#corral fetch
+	corral run -- $(DEBUGPONYC)  QUIC/test/network/server -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
+	lldb ./build/test/server
 test/network/client: libponyquic
 	#corral fetch
 	corral run -- ponyc  QUIC/test/network/client -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
