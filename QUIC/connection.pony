@@ -246,7 +246,7 @@ actor QUICConnection is NotificationEmitter
     _ctx = ctx
     _connection = connection
 
-  be start( ip: String, port: U16, family: QUICAddressFamily = Unspecified, resumptionTicket: (Array[U8] val | None) = None) =>
+  be start(ip: String, port: U16, family: QUICAddressFamily = Unspecified, resumptionTicket: (Array[U8] val | None) = None) =>
     if not _started then
       try
         match resumptionTicket

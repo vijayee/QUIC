@@ -2,6 +2,7 @@ use "pony_test"
 use "../../.."
 use "Streams"
 use "Exception"
+use "promises"
 use "Print"
 
 actor Main
@@ -35,7 +36,7 @@ class iso _TestServer is UnitTest
       let registration = QUICRegistration(t.env.root, "test")?
       let settings: QUICSettings iso = recover
         let settings': QUICSettings = QUICSettings
-        settings'.idleTimeoutMs= 1000
+        settings'.idleTimeoutMs = 1000
         settings'.serverResumptionLevel = ResumeAndZeroRTT()
         settings'.peerBidiStreamCount = 1
         settings'
@@ -44,7 +45,7 @@ class iso _TestServer is UnitTest
       let certificate: QUICCertificate = QUICCertificate("./server1.crt", "./server1.key")
       let credentials: QUICCredentials = QUICCredentials(certificate)
       try
-        let configuration: QUICConfiguration = QUICConfiguration(registration, ["this"], consume settings, credentials)?
+        let configuration: QUICConfiguration = QUICConfiguration(registration, ["sample"], consume settings, credentials)?
         let listenerStarted: ListenerStartedNotify iso = object iso is ListenerStartedNotify
           let _t: TestHelper = t
           fun ref apply() =>
@@ -70,9 +71,38 @@ class iso _TestServer is UnitTest
             Println("closed")
             _configuration.close()
         end
-        let newConnectionNotify: NewConnectionNotify = object iso is NewConnectionNotify
+        let newConnectionNotify: NewConnectionNotify iso = object iso is NewConnectionNotify
           let _t: TestHelper = t
           fun ref apply(data: QUICConnection) =>
+            Println("New Connection received")
+            let peerStreamStartedNotify: PeerStreamStartedNotify iso = object iso is PeerStreamStartedNotify
+              let _t: TestHelper = _t
+              fun apply(data: QUICStream) =>
+                match data
+                  | let ds: QUICDuplexStream =>
+                    let promise = Promise[Array[U8] val]
+                    let dataNotify: DataNotify[Array[U8] iso] iso = object iso is DataNotify[Array[U8] iso]
+                      let _promise: Promise[Array[U8] val] = promise
+                      fun ref apply(data: Array[U8] iso) =>
+                        _promise(consume data)
+                    end
+                    ds.subscribe(consume dataNotify)
+                    let peerSendShutdownNotify: PeerSendShutdownNotify iso = object iso is PeerSendShutdownNotify
+                      let _promise: Promise[Array[U8] val] = promise
+                      let _ds: QUICDuplexStream = ds
+                      fun ref apply() =>
+                        let writeFulfill= object iso is Fulfill[Array[U8] val, Array[U8] val]
+                          let ds: QUICDuplexStream = _ds
+                          fun apply(data: Array[U8] val): Array[U8] val =>
+                            ds.write(data)
+                            data
+                        end
+                        _promise.next[Array[U8] val](consume writeFulfill)
+                    end
+                    ds.subscribe(consume peerSendShutdownNotify)
+                end
+            end
+            data.subscribe(consume peerStreamStartedNotify)
             _t.complete_action("client connection")
         end
         try
@@ -82,7 +112,7 @@ class iso _TestServer is UnitTest
           server.subscribe(consume listenerStarted)
           server.subscribe(consume listenerStopped)
           server.subscribe(consume closeNotify)
-          server.listen(9090)
+          server.listen(4567)
           //server.stopListening()
          //server.close()
         else
@@ -95,4 +125,3 @@ class iso _TestServer is UnitTest
     else
       t.fail("Registration Error")
     end
-    

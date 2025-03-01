@@ -63,11 +63,10 @@ test/network/client/threadsanitizer: libponyquicTS
 	./build/test/client
 test/network/client/addresssanitizer: libponyquicAS
 	#corral fetch
-	corral run -- $(DEBUGPONYC)  QUIC/test/network/client -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
-	./build/test/client
+	corral run -- ponyc  QUIC/test/network/server -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
 test/network/server/debug: libponyquic
 	#corral fetch
-	corral run -- $(DEBUGPONYC)  QUIC/test/network/server -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
+	corral run -- ponyc  QUIC/test/network/server -o build/test --verbose =4 --debug -p build/lib -p $(MSQUICLIBPATH) -p $(OPENSSLLIBPATH)
 	lldb ./build/test/server
 clean:
 	rm -rf build

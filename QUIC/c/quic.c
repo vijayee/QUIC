@@ -364,22 +364,43 @@ int serverCb(HQUIC listener, void* context, QUIC_LISTENER_EVENT* event) {
       evt->STOP_COMPLETE.RESERVED = event->STOP_COMPLETE.RESERVED;
       break;
   }
-  quic_enqueue_event(ctx->events, evt, QUIC_LISTENER_EVENTS);
+  quic_listener_event_wrapper* wrapper = calloc(1, sizeof(quic_listener_event_wrapper));
+  wrapper->event = evt;
+  if (event->Type == QUIC_LISTENER_EVENT_NEW_CONNECTION) {
+    quic_event_queue* queue = quic_new_event_queue();
+    wrapper->ctx= quic_new_connection_event_context(0, ctx->connectionCb, queue);
+    MSQuic->SetCallbackHandler(event->NEW_CONNECTION.Connection, connectionCb, wrapper->ctx);
+    wrapper->status = MSQuic->ConnectionSetConfiguration(event->NEW_CONNECTION.Connection, *ctx->configuration);
+  }
+  quic_enqueue_event(ctx->events, wrapper, QUIC_LISTENER_EVENTS);
+
   void (*cb)(void*) = (void (*)(void*)) ctx->cb;
   (*cb)(ctx);
-  return 0;
+  pony_unregister_thread();
+  return (int)wrapper->status;
 }
-
+void* quic_server_event_from_wrapper(quic_listener_event_wrapper* wrapper) {
+  return  wrapper->event;
+}
+void* quic_server_connection_context_from_wrapper(quic_listener_event_wrapper* wrapper) {
+  return wrapper->ctx;
+}
+quic_event_queue* quic_server_connection_queue_from_context(quic_connection_event_context* ctx) {
+  return ctx->events;
+}
+int quic_server_configuration_status_from_wrapper(quic_listener_event_wrapper* wrapper) {
+  return wrapper->status;
+}
 void quic_server_free_event(QUIC_LISTENER_EVENT* event) {
   switch (event->Type) {
     case QUIC_LISTENER_EVENT_NEW_CONNECTION:
-      free((void*) event->NEW_CONNECTION.Info);
       free((void*)event->NEW_CONNECTION.Info->LocalAddress);
       free((void*)event->NEW_CONNECTION.Info->RemoteAddress);
       free((void*)event->NEW_CONNECTION.Info->CryptoBuffer);
       free((void*)event->NEW_CONNECTION.Info->ClientAlpnList);
       free((void*)event->NEW_CONNECTION.Info->NegotiatedAlpn);
       free((void*)event->NEW_CONNECTION.Info->ServerName);
+      free((void*)event->NEW_CONNECTION.Info);
       break;
     case QUIC_LISTENER_EVENT_STOP_COMPLETE:
       free(event);
@@ -459,10 +480,6 @@ void quic_send_resumption_ticket(HQUIC connection) {
 
 void quic_close_connection(HQUIC connection) {
   MSQuic->ConnectionClose(connection);
-}
-
-void quic_connection_set_callback(HQUIC connection, void* connectionCallback, void* ctx) {
-  MSQuic->SetCallbackHandler(connection, connectionCallback, ctx);
 }
 
 HQUIC quic_receive_stream(QUIC_CONNECTION_EVENT* event) {
@@ -622,6 +639,7 @@ quic_connection_event_context* quic_new_connection_event_context(uint8_t isClien
   ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT =1;
   ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER = 1;
   ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE= 1;
+  platform_lock_init(ctx->lock);
   platform_lock_init(ctx->QUIC_CONNECTION_EVENT_CONNECTED_LOCK);
   platform_lock_init(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT_LOCK);
   platform_lock_init(ctx->QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER_LOCK);
@@ -664,7 +682,9 @@ void quic_free_connection_event_context(quic_connection_event_context* ctx) {
 }
 
 void quic_connection_event_context_set_actor(quic_connection_event_context* ctx, void* connectionActor) {
+    platform_lock(ctx->lock);
     ctx->connectionActor = connectionActor;
+    platform_lock(ctx->lock);
 }
 
 void quic_enqueue_event(quic_event_queue* queue, void* event, quic_event_type type) {
@@ -690,6 +710,14 @@ void* quic_dequeue_event(quic_event_queue* queue, uint8_t type) {
     free(node);
     return event;
   }
+}
+
+int quic_queue_empty(quic_event_queue* queue) {
+  int i = 1;
+  platform_lock(queue->lock);
+  i = TAILQ_EMPTY(&queue->next);
+  platform_unlock(queue->lock);
+  return i;
 }
 
 quic_event_queue* quic_new_event_queue() {
@@ -779,8 +807,12 @@ unsigned int connectionCb(HQUIC connection, void* context, QUIC_CONNECTION_EVENT
       break;
   }
   quic_enqueue_event(ctx->events, evt, QUIC_CONNECTION_EVENTS);
-  void (*cb)(void*) = (void (*)(void*)) ctx->cb;
-  (*cb)(ctx);
+  platform_lock(ctx->lock);
+  if (ctx->connectionActor != NULL) {
+    void (*cb)(void*) = (void (*)(void*)) ctx->cb;
+    (*cb)(ctx);
+  }
+  platform_unlock(ctx->lock);
   return 0;
 }
 
@@ -806,10 +838,12 @@ HQUIC quic_connection_open(HQUIC registration, void* callback, quic_connection_e
    return connection;
 }
 
-quic_server_event_context* quic_new_server_event_context(void* serverActor, void* cb, quic_event_queue* queue) {
+quic_server_event_context* quic_new_server_event_context(void* serverActor, void* cb, quic_event_queue* queue, HQUIC* configuration, void* connectionCb) {
   quic_server_event_context* ctx = calloc(1, sizeof(quic_server_event_context));
   ctx->serverActor = serverActor;
+  ctx->configuration= configuration;
   ctx->cb = cb;
+  ctx->connectionCb = connectionCb;
   ctx->events = queue;
   return ctx;
 }
@@ -1222,12 +1256,12 @@ uint8_t quic_server_resumption_resume_and_zerortt() {
   return (uint8_t) QUIC_SERVER_RESUME_AND_ZERORTT;
 };
 
-void quic_server_listener_start(HQUIC listener, char** alpn, uint32_t alpnSize, int family, char* ip, char* port) {
-  struct addrinfo hints;
+void quic_server_listener_start(HQUIC listener, char** alpn, uint32_t alpnSize, int family, char* ip, uint16_t port) {
+  /*struct addrinfo hints;
   memset(&hints, 0, sizeof(struct addrinfo));
   hints.ai_flags = AI_ADDRCONFIG;
   hints.ai_family = family;
-  hints.ai_socktype = SOCK_DGRAM;
+  hints.ai_socktype = SOCK_DGRAM
   hints.ai_protocol = IPPROTO_UDP;
   if((ip != NULL) && (ip[0] == '\0'))
     ip = NULL;
@@ -1239,19 +1273,35 @@ void quic_server_listener_start(HQUIC listener, char** alpn, uint32_t alpnSize, 
     return;
   }
   QUIC_ADDR address = {0};
-  address.Ip = *result->ai_addr;
-
+  address->Ip.sa_family= result->ai_family
+  if (address->Ip.sa_family == QUIC_ADDRESS_FAMILY_INET6) {
+    address->Ipv6.sin6_port = htons(port);
+  } else {
+    address->Ipv4.sin_port = htons(port);
+  }
+  if (ip != NULL) {
+    address.Ip = *result->ai_addr;
+  }
+  */
+  QUIC_ADDR address = {0};
+  /*
+  if (QuicAddrFromString(ip, port, &address) == FALSE) {
+    pony_error();
+    return;
+  }*/
+  QuicAddrSetFamily(&address, family);
+  QuicAddrSetPort(&address, port);
   QUIC_BUFFER alpns[alpnSize];
-
+  //const QUIC_BUFFER Alpn = { sizeof("sample") - 1, (uint8_t*)"sample" };
   for (int i = 0; i < alpnSize; i++) {
     alpns[i] = (QUIC_BUFFER) { .Length = strlen(alpn[i]), .Buffer = (uint8_t*) alpn[i] };
   }
-  if (QUIC_FAILED(MSQuic->ListenerStart(listener, (const QUIC_BUFFER* const)&alpns, alpnSize, &address))) {
-    freeaddrinfo(result);
+  if (QUIC_FAILED(MSQuic->ListenerStart(listener, (const struct QUIC_BUFFER *const) &alpns, alpnSize, &address))) {
+    //freeaddrinfo(result);
     pony_error();
     return;
   }
-  freeaddrinfo(result);
+  //freeaddrinfo(result);
 }
 
 int quic_address_family_unspecified() {
@@ -1275,8 +1325,4 @@ void quic_configuration_close(HQUIC* configuration) {
 }
 uint8_t quic_connection_is_client(quic_connection_event_context* ctx) {
   return ctx->isClient;
-}
-
-void arbitrary_sleep() {
-  sleep(2);
 }

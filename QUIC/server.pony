@@ -2,6 +2,8 @@ use "collections"
 use "Streams"
 use "Exception"
 use "Print"
+use "time"
+
 primitive NoResume
   fun apply(): U8 =>
     @quic_server_resumption_no_resume()
@@ -22,7 +24,7 @@ primitive NewQUICServer
   fun apply(registration: QUICRegistration, configuration: QUICConfiguration val): QUICServer ?  =>
     let queue: Pointer[None] tag = @quic_new_event_queue()
     let server: QUICServer = QUICServer._create(registration, configuration, queue)
-    let ctx: Pointer[None] tag = @quic_new_server_event_context(server, addressof _QUICServerCallback.apply, queue)
+    let ctx: Pointer[None] tag = @quic_new_server_event_context(server, addressof _QUICServerCallback.apply, queue, configuration.config, addressof _QUICConnectionCallback.apply)
     try
       let listener = @quic_server_listener_open(registration.registration, ctx)?
       server._initialize(ctx, listener)
@@ -32,6 +34,19 @@ primitive NewQUICServer
       error
     end
     server
+
+
+ class TestNotify is TimerNotify
+   let _server: QUICServer
+
+
+   new iso create(server: QUICServer) =>
+     _server = server
+
+   fun ref apply(timer: Timer, count: U64): Bool =>
+     Println("timer fire")
+     _server._fromTimer()
+     true
 
 actor QUICServer is NotificationEmitter
   let _subscribers: Subscribers
@@ -51,6 +66,13 @@ actor QUICServer is NotificationEmitter
     _listener = Pointer[None]
     _ctx = Pointer[None]
     _queue = queue
+
+    let timers = Timers
+    let timer = Timer(TestNotify(this), 5_000_000_000, 2_000_000_000)
+    timers(consume timer)
+
+  be _fromTimer() =>
+    Println("Got a timer")
 
   be _initialize(ctx: Pointer[None] tag, listener: Pointer[None] tag) =>
     _isClosed = false
@@ -99,7 +121,7 @@ actor QUICServer is NotificationEmitter
       for app in _configuration.alpn.values() do
         alpn.push(app.cstring())
       end
-      @quic_server_listener_start(_listener, alpn.cpointer(), alpn.size().u32(), family(), ip.cstring(), port.string().cstring())?
+      @quic_server_listener_start(_listener, alpn.cpointer(), alpn.size().u32(), family(), ip.cstring(), port)?
       notify(ListenerStartedEvent)
     else
       notifyError(Exception("Failed to start server listener"))
@@ -118,20 +140,24 @@ actor QUICServer is NotificationEmitter
 
   be _readEventQueue() =>
     try
-      let event: Pointer[None] tag = @quic_dequeue_event(_queue, 0)?
+      let wrapper: Pointer[None] tag = @quic_dequeue_event(_queue, 0)?
+      let event: Pointer[None] tag = @quic_server_event_from_wrapper(wrapper)
       match @quic_server_event_type_as_int(event)
         | 0  =>
           let conn: Pointer[None] tag = @quic_receive_connection(event)
-          let queue = @quic_new_event_queue()
-          let connectionCtx: Pointer[None] tag = @quic_new_connection_event_context(0, Pointer[None], queue)
+          let connectionCtx: Pointer[None] tag = @quic_server_connection_context_from_wrapper(wrapper)
+          let queue: Pointer[None] tag = @quic_server_connection_queue_from_context(connectionCtx)
           let connection: QUICConnection = QUICConnection._serverConnection(conn, connectionCtx, queue)
           @quic_connection_event_context_set_actor(connectionCtx, connection)
+          let status: I32 = @quic_server_configuration_status_from_wrapper(wrapper)
 
-          @quic_connection_set_callback(conn, addressof _QUICConnectionCallback.apply, connectionCtx)
-          let status: U32 = @quic_connection_set_configuration(conn, _configuration.config)
-
-          if status == 0 then
+          if status == -2 then
             _acceptNewConnection(connection)
+            if (@quic_queue_empty(queue) == 0) then
+              connection._readEventQueue()
+            end
+          else
+            notifyError(Exception("Failed to set configuration for new connection"))
           end
       | 1 =>
         return
